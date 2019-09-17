@@ -57,7 +57,7 @@ bool Pwmgen::begin()
     // init the PWM timer
     DEBUG_PWM("## init duty : %f \r\n", this->_duty);
     DEBUG_PWM("## init freq  : %i \r\n", this->_freq);
-    DEBUG_PWM("##  init duty step : %f \r\n", this->_dutyStep);
+    DEBUG_PWM("## init duty step : %f \r\n", this->_dutyStep);
     DEBUG_PWM("## init freq step : %i \r\n", this->_freqStep);
     DEBUG_PWM("## init led state : %i \r\n", this->_ledState);
     DEBUG_PWM("## init pwm state : %i \r\n", this->_pwmState);
@@ -72,7 +72,7 @@ bool Pwmgen::begin()
     this->_pwm_timer.speed_mode = LEDC_HIGH_SPEED_MODE;
     this->_pwm_timer.timer_num = LEDC_TIMER_0;
     //chnnle setup
-    temp_duty = map((double)(this->_duty / this->_dutyStep), 0, (double)(100 / this->_dutyStep), 0, this->_dutyRes-1);
+    temp_duty = map((double)(this->_duty / this->_dutyStep), 0, (double)(100 / this->_dutyStep), 0, this->_dutyRes - 1);
     this->_pwm_channel.channel = LEDC_CHANNEL_0;
     this->_pwm_channel.duty = temp_duty;
     this->_pwm_channel.gpio_num = this->_pwmPin;
@@ -141,7 +141,7 @@ void Pwmgen::setFreq(uint32_t freq)
     // }
     this->_freq = freq;
     this->_pwm_timer.duty_resolution = LEDC_TIMER_10_BIT; //0-1023 dimming range
-    this->_dutyRes = (1U << LEDC_TIMER_10_BIT ) ;
+    this->_dutyRes = (1U << LEDC_TIMER_10_BIT);
     DEBUG_PWM("Duty_resolution 0- %i\r\n", this->_dutyRes);
 
     err = ledc_set_freq(this->_pwm_timer.speed_mode, this->_pwm_timer.timer_num, this->_freq);
@@ -152,7 +152,7 @@ void Pwmgen::setFreq(uint32_t freq)
     if (!this->getPwmState())
         err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
     else
-        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map(this->_duty / MIN_DUTY_STEP, 0, 100 / MIN_DUTY_STEP, 0, this->_dutyRes-1), 0);
+        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map(this->_duty / MIN_DUTY_STEP, 0, 100 / MIN_DUTY_STEP, 0, this->_dutyRes - 1), 0);
 }
 
 void Pwmgen::setFreqStep(uint32_t freqStep)
@@ -167,7 +167,6 @@ void Pwmgen::setPwmState(uint8_t pwmState)
 void Pwmgen::setLedState(uint8_t ledState)
 {
     this->_ledState = ledState;
-
 
     digitalWrite(this->_ledPin, _ledState);
 }
@@ -184,7 +183,8 @@ int16_t Pwmgen::getOledSleepTime(void)
 
 uint8_t Pwmgen::bSaveConfig()
 {
-    const size_t capacity = JSON_OBJECT_SIZE(8);
+    const size_t capacity = JSON_OBJECT_SIZE(11);
+    StaticJsonDocument<capacity> doc;
     // Open file for writing
     File file = SPIFFS.open(USER_JSON_FILE_PATH, FILE_WRITE);
     if (!file)
@@ -192,20 +192,18 @@ uint8_t Pwmgen::bSaveConfig()
         DEBUG_PWM("Can't create the %s file.", USER_JSON_FILE_PATH);
         return 1;
     }
-
-    // Allocate a temporary JsonDocument
-    // Don't forget to change the capacity to match your requirements.
-    // Use arduinojson.org/assistant to compute the capacity.
-    DynamicJsonDocument doc(capacity);
-
     // Set the values in the document
     doc["FREQ"] = 10000;
-    doc["DUTY"] = 50.00;
-    doc["LED_STATE"] = 1;
-    doc["PWM_STATE"] = 1;
-    doc["FREQ_STEP"] = 1000;
-    doc["DUTY_STEP"] = 1;
-    doc["OLED_SLEEP_TIME"] = 5; // minutes
+    doc["DUTY"] = 50;
+    doc["LED_STATE"] = 0;
+    doc["PWM_STATE"] = 0;
+    doc["FREQ_STEP"] = 100;
+    doc["DUTY_STEP"] = 0.5;
+    doc["OLED_SLEEP_TIME"] = 1;
+    doc["LED_ON_DELAY"] = 0;
+    doc["PWM_ON_DELAY"] = 0;
+    doc["TURN_ON_PRI"] = 0;
+    doc["AUTO_DIM_DURATION"] = 500;
 
     // Serialize JSON to file
     if (serializeJson(doc, file) == 0)
@@ -282,6 +280,40 @@ uint8_t Pwmgen::bResetConfig()
     //Create File
 }
 
+void Pwmgen::_CreateFactorySetting()
+{
+    const size_t capacity = JSON_OBJECT_SIZE(11);
+    DynamicJsonDocument doc(capacity);
+    DeserializationError err;
+    File f;
+    size_t byteWrite;
+    String tempStr = "";
+    f = SPIFFS.open(DEFAULT_JSON_FILE_PATH, "w+");
+    if (!f)
+    {
+        DEBUG_PWM("\r\nFile open fail %s \r\n ", DEFAULT_JSON_FILE_PATH);
+    }
+
+    doc["FREQ"] = 10000;
+    doc["DUTY"] = 50;
+    doc["LED_STATE"] = 0;
+    doc["PWM_STATE"] = 0;
+    doc["FREQ_STEP"] = MIN_FREQ_STEP;
+    doc["DUTY_STEP"] = MIN_DUTY_STEP;
+    doc["OLED_SLEEP_TIME"] = 1;
+    doc["LED_ON_DELAY"] = 0;
+    doc["PWM_ON_DELAY"] = 0;
+    doc["TURN_ON_PRI"] = 0;
+    doc["AUTO_DIM_DURATION"] = 500;
+
+    byteWrite = serializeJson(doc, f);
+    if (byteWrite > 0)
+    {
+        DEBUG_PWM("\r\nFile write completed. byte write : %d \r\n ", byteWrite);
+        serializeJson(doc, tempStr);
+        DEBUG_PWM("JSON Contennts: \r\n %s", tempStr.c_str());
+    }
+}
 /**
  * @brief Load config 
  * 
@@ -290,72 +322,52 @@ uint8_t Pwmgen::bResetConfig()
  * default : /def.json
  * user : /user.json 
  */
+
 uint8_t Pwmgen::bLoadConfig()
 {
-    const size_t capacity = JSON_OBJECT_SIZE(7) + 80;
+    const size_t capacity = JSON_OBJECT_SIZE(11) + 140;
     DynamicJsonDocument doc(capacity);
     DeserializationError err;
     File f;
     size_t byteWrite;
     String tempStr = "";
-    // "/user.json" not  exists , Create file
+    // "/user.json" 檔案不存在
     if (!SPIFFS.exists(USER_JSON_FILE_PATH))
     {
-        //copy def.json to user.json
-        DEBUG_PWM("\r\nFile %c not exist , will load default settings \r\n", USER_JSON_FILE_PATH);
-
-        if (!SPIFFS.exists(DEFAULT_JSON_FILE_PATH)) // def.json not exitsts then create default file
+        if (!SPIFFS.exists(DEFAULT_JSON_FILE_PATH))
         {
-            DEBUG_PWM("\r\nFile %c  not exist , will auto create  default settings\r\n", DEFAULT_JSON_FILE_PATH);
-            //default pwm data
-            doc["FREQ"] = 10000;
-            doc["DUTY"] = 50.00;
-            doc["LED_STATE"] = 0;
-            doc["PWM_STATE"] = 0;
-            doc["FREQ_STEP"] = MIN_FREQ_STEP;
-            doc["DUTY_STEP"] = MIN_DUTY_STEP;
-            doc["OLED_SLEEP_TIME"] = 1; // minutes
-            f = SPIFFS.open(DEFAULT_JSON_FILE_PATH, "w+");
-
-            if (!f)
-            {
-                DEBUG_PWM("\r\nFile open fail %c \r\n ", DEFAULT_JSON_FILE_PATH);
-                return 1;
-            }
-
-            byteWrite = serializeJson(doc, f);
-            if (byteWrite <= 0)
-            {
-                DEBUG_PWM("\r\nDefaule setting created fial ,path:%c.\r\n", DEFAULT_JSON_FILE_PATH);
-                return 1;
-            }
-            DEBUG_PWM("\r\nDefault setting created ,Write %d bytes.\r\n", byteWrite);
-            serializeJson(doc, tempStr);
-            DEBUG_PWM("json: %s", tempStr.c_str());
-            byteWrite = 0;
-            f.close();
-            doc.clear();
-            tempStr = "";
+            _CreateFactorySetting();
         }
 
-        //load Default config file
+        f = SPIFFS.open(DEFAULT_JSON_FILE_PATH, "r");
+        tempStr = "";
 
-        f = SPIFFS.open(DEFAULT_JSON_FILE_PATH, FILE_READ);
+        while (f.available())
+        {
+            tempStr += char(f.read());
+        }
+        f.close();
 
+        f = SPIFFS.open(USER_JSON_FILE_PATH, "w+");
         if (!f)
         {
-            DEBUG_PWM("\r\nFile open fail %c \r\n ", DEFAULT_JSON_FILE_PATH);
+            f.close();
             return 1;
         }
-
+        f.print(tempStr);
+        f.close();
+        bLoadConfig();
+    }
+    else
+    {
+        f = SPIFFS.open(USER_JSON_FILE_PATH, FILE_READ);
+        Serial.printf("Read file %s ,contents : \r\n", USER_JSON_FILE_PATH);
         err = deserializeJson(doc, f);
-
         if (err != DeserializationError::Ok)
         {
-            DEBUG_PWM("\r\n Deserial Json fail %c\r\n ", err.c_str());
+            Serial.printf("Deserialization error %d : \r\n", err);
             return 1;
         }
-
         this->_freq = (uint32_t)doc["FREQ"];       // 10000
         this->_duty = (float)doc["DUTY"];          // 50
         this->_ledState = doc["LED_STATE"];        // 0
@@ -363,56 +375,144 @@ uint8_t Pwmgen::bLoadConfig()
         this->_freqStep = doc["FREQ_STEP"];        // 100
         this->_dutyStep = (float)doc["DUTY_STEP"]; // 1
         this->_oledSleepTime = doc["OLED_SLEEP_TIME"];
-        //close file
-        f.close();
-        //open new file
-        f = SPIFFS.open(USER_JSON_FILE_PATH, "w+");
-        //save json to file
-        byteWrite = serializeJson(doc, f);
-        if (byteWrite <= 0)
-        {
-            DEBUG_PWM("\r\nDefault setting created %c .\r\n", USER_JSON_FILE_PATH);
-            return 1;
-        }
-        DEBUG_PWM("\r\nLoad user config file OK \r\n ");
-        serializeJsonPretty(doc, tempStr);
-        DEBUG_PWM("json:%s", tempStr.c_str());
-        doc.clear();
-        f.close();
-        tempStr = "";
+        this->_ledOnDelay = doc["LED_ON_DELAY"];
+        this->_pwmOnDelay = doc["PWM_ON_DELAY"];
+        this->_turnOnPriority = doc["TURN_ON_PRI"];
+        this->_autoDimDuration = doc["AUTO_DIM_DURATION"];
+       serializeJsonPretty (doc,Serial);
     }
-
-    f = SPIFFS.open(USER_JSON_FILE_PATH, FILE_READ);
-
-    if (!f)
-    {
-        DEBUG_PWM("\r\nFile open fail path %c \r\n", USER_JSON_FILE_PATH);
-        return 1;
-    }
-
-    err = deserializeJson(doc, f);
-
-    if (err != DeserializationError::Ok)
-    {
-        DEBUG_PWM("\r\nDeserial config fail  path:%c\r\n", USER_JSON_FILE_PATH);
-        DEBUG_PWM(err.c_str());
-        return 1;
-    }
-    this->_freq = doc["FREQ"];                     // 10000
-    this->_duty = doc["DUTY"];                     // 50
-    this->_ledState = doc["LED_STATE"];            // 0
-    this->_pwmState = doc["PWM_STATE"];            // 0
-    this->_freqStep = doc["FREQ_STEP"];            // 100
-    this->_dutyStep = doc["DUTY_STEP"];            // 1
-    this->_oledSleepTime = doc["OLED_SLEEP_TIME"]; // 1
-    DEBUG_PWM("\r\nLoad settings OK , path:%c \r\n ", USER_JSON_FILE_PATH);
-    serializeJsonPretty(doc, tempStr);
-    DEBUG_PWM("json :%s", tempStr.c_str());
-    f.close();
     doc.clear();
-    tempStr = "\0";
+    f.close();
     return 0;
 }
+
+// ////
+// if (!SPIFFS.exists(USER_JSON_FILE_PATH))
+// {
+//     //copy def.json to user.json
+//     DEBUG_PWM("\r\nFile %s not exist , will load default settings \r\n", USER_JSON_FILE_PATH);
+
+//     if (!SPIFFS.exists(DEFAULT_JSON_FILE_PATH)) // def.json not exitsts then create default file
+//     {
+//         DEBUG_PWM("\r\nFile %c  not exist , will auto create  default settings\r\n", DEFAULT_JSON_FILE_PATH);
+//         //default pwm data
+//         doc["FREQ"] = 10000;
+//         doc["DUTY"] = 50;
+//         doc["LED_STATE"] = 0;
+//         doc["PWM_STATE"] = 0;
+//         doc["FREQ_STEP"] = MIN_FREQ_STEP;
+//         doc["DUTY_STEP"] = MIN_DUTY_STEP;
+//         doc["OLED_SLEEP_TIME"] = 1;
+//         doc["LED_ON_DELAY"] = 0;
+//         doc["PWM_ON_DELAY"] = 0;
+//         doc["TURN_ON_PRI"] = 0;
+//         doc["AUTO_DIM_DURATION"] = 500;
+
+//         f = SPIFFS.open(DEFAULT_JSON_FILE_PATH, "w+");
+
+//         if (!f)
+//         {
+//             DEBUG_PWM("\r\nFile open fail %c \r\n ", DEFAULT_JSON_FILE_PATH);
+//             return 1;
+//         }
+
+//         byteWrite = serializeJson(doc, f);
+//         if (byteWrite <= 0)
+//         {
+//             DEBUG_PWM("\r\nDefaule setting created fial ,path:%s .\r\n", DEFAULT_JSON_FILE_PATH);
+//             return 1;
+//         }
+//         DEBUG_PWM("\r\nDefault setting created path:%s ,Write %d bytes.\r\n", DEFAULT_JSON_FILE_PATH, byteWrite);
+//         serializeJson(doc, tempStr);
+//         DEBUG_PWM("json: %s", tempStr.c_str());
+//         byteWrite = 0;
+//         f.close();
+//         doc.clear();
+//         tempStr = "";
+//     }
+
+//     //load Default config file
+
+//     f = SPIFFS.open(DEFAULT_JSON_FILE_PATH, FILE_READ);
+
+//     if (!f)
+//     {
+//         DEBUG_PWM("\r\nFile open fail %c \r\n ", DEFAULT_JSON_FILE_PATH);
+//         return 1;
+//     }
+
+//     err = deserializeJson(doc, f);
+
+//     if (err != DeserializationError::Ok)
+//     {
+//         DEBUG_PWM("\r\n Deserial Json fail %c\r\n ", err.c_str());
+//         return 1;
+//     }
+
+//     this->_freq = (uint32_t)doc["FREQ"];       // 10000
+//     this->_duty = (float)doc["DUTY"];          // 50
+//     this->_ledState = doc["LED_STATE"];        // 0
+//     this->_pwmState = doc["PWM_STATE"];        // 0
+//     this->_freqStep = doc["FREQ_STEP"];        // 100
+//     this->_dutyStep = (float)doc["DUTY_STEP"]; // 1
+//     this->_oledSleepTime = doc["OLED_SLEEP_TIME"];
+//     this->_ledOnDelay = doc["LED_ON_DELAY"];
+//     this->_pwmOnDelay = doc["PWM_ON_DELAY"];
+//     this->_turnOnPriority = doc["TURN_ON_PRI"];
+//     this->_autoDimDuration = doc["AUTO_DIM_DURATION"];
+//     //close file
+//     f.close();
+//     //open new file
+//     f = SPIFFS.open(USER_JSON_FILE_PATH, "w+");
+//     //save json to file
+//     byteWrite = serializeJson(doc, f);
+//     if (byteWrite <= 0)
+//     {
+//         DEBUG_PWM("\r\nDefault setting created %c .\r\n", USER_JSON_FILE_PATH);
+//         return 1;
+//     }
+//     DEBUG_PWM("\r\nLoad user config file OK \r\n ");
+//     serializeJsonPretty(doc, tempStr);
+//     DEBUG_PWM("json:\r\n %s", tempStr.c_str());
+//     doc.clear();
+//     f.close();
+//     tempStr = "";
+// }
+
+// f = SPIFFS.open(USER_JSON_FILE_PATH, FILE_READ);
+
+// if (!f)
+// {
+//     DEBUG_PWM("\r\nFile open fail path %c \r\n", USER_JSON_FILE_PATH);
+//     return 1;
+// }
+
+// err = deserializeJson(doc, f);
+
+// if (err != DeserializationError::Ok)
+// {
+//     DEBUG_PWM("\r\nDeserial config fail  path:%c\r\n", USER_JSON_FILE_PATH);
+//     DEBUG_PWM(err.c_str());
+//     return 1;
+// }
+// this->_freq = doc["FREQ"];                     // 10000
+// this->_duty = doc["DUTY"];                     // 50
+// this->_ledState = doc["LED_STATE"];            // 0
+// this->_pwmState = doc["PWM_STATE"];            // 0
+// this->_freqStep = doc["FREQ_STEP"];            // 100
+// this->_dutyStep = doc["DUTY_STEP"];            // 1
+// this->_oledSleepTime = doc["OLED_SLEEP_TIME"]; // 1
+// this->_ledOnDelay = doc["LED_ON_DELAY"];
+// this->_pwmOnDelay = doc["PWM_ON_DELAY"];
+// this->_turnOnPriority = doc["TURN_ON_PRI"];
+// this->_autoDimDuration = doc["AUTO_DIM_DURATION"];
+
+// DEBUG_PWM("\r\nLoad settings OK , path:%c \r\n ", USER_JSON_FILE_PATH);
+// serializeJsonPretty(doc, tempStr);
+// DEBUG_PWM("json : \r\n %s", tempStr.c_str());
+// f.close();
+// doc.clear();
+// tempStr = "\0";
 
 //private function
 

@@ -77,7 +77,7 @@ bool ScreenSleepEnable = false;
 
 // menu Text
 String main_menu_item[9] = {"PWM:", "LED:", "Duty SETUP", "Freq SETUP", "AUTO DIM", "SAVE", "RESET ", "SETUP", "WIFI IP"};
-String setup_menu_item[7] = {"Back to Main", "PWM ON delay", "LED On delay", "Turn-On Priority", "OLED Sleep", "Duty Step", "Freq Step "};
+String setup_menu_item[8] = {"Back to Main", "PWM ON delay", "LED On delay", "Turn-On Priority", "OLED Sleep", "Duty Step", "Freq Step ", "Auto dim time"};
 //Wifi ssid and password
 char ssid[23];
 const char *password = NULL;
@@ -141,7 +141,7 @@ void setup()
     {
         DEBUG_PRINTF("\r\nSystem begin  \r\n");
 
-        mypwm.bResetConfig();
+       // mypwm.bResetConfig();
     }
     else
     {
@@ -264,12 +264,12 @@ void drawDutyFreq()
     char buffer[20];
 
     display.setFont(Serif_plain_8);
-    display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
     sprintf(buffer, "D:%.1f%%", mypwm.getDuty());
-    display.drawString((display.getWidth()), 3, buffer);
+    display.drawString(88, 3, buffer);
     // memset(buffer, '0', sizeof(buffer));
     sprintf(buffer, "F:%.1fK", (float)(mypwm.getFreq() / 1000));
-    display.drawString((display.getWidth()), 19, buffer);
+    display.drawString(88, 19, buffer);
 }
 /**
  * *************************************************************************
@@ -312,6 +312,119 @@ void drawMainMenu()
             else
                 MenuItemSelected(main_menu_item[1] + "OFF", 16, false, setup_mode);
         }
+        else if (menuIndex == 1 && frame == 2)
+        {
+            /**
+             * ---------------
+             * | LED:ON(OFF) |
+             * ---------------
+             * 
+             *  DUTY Setup
+             * 
+             */
+            drawDutyFreq();
+            display.setFont(Serif_plain_12);
+            if (mypwm.getLedState())
+                MenuItemSelected(main_menu_item[1] + "ON", 0, true, setup_mode);
+            else
+                MenuItemSelected(main_menu_item[1] + "OFF", 0, true, setup_mode);
+
+            MenuItemSelected(main_menu_item[2], 16, false, setup_mode);
+        }
+        else if (menuIndex == 2 && frame == 3)
+        {
+            /**
+             * 
+             * --------------
+             * | Duty setup |
+             * --------------
+             * 
+             *  Freq setup 
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, bell_curve_width, bell_curve_height, bell_curve_bits);
+            display.setFont(Serif_plain_12);
+            MenuItemSelected(main_menu_item[2], 0, true, setup_mode);
+            MenuItemSelected(main_menu_item[3], 16, false, setup_mode);
+        }
+
+        else if (menuIndex == 3 && frame == 4)
+        {
+            /**
+             *--------------
+             *| Freq setup |
+             * -------------
+             * 
+             *  Auto dim 
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, frequency_icon_width, frequency_icon_height, frequency_icon_bits);
+            display.setFont(Serif_plain_12);
+            MenuItemSelected(main_menu_item[3], 0, true, setup_mode);
+            MenuItemSelected(main_menu_item[4], 16, false, setup_mode);
+        }
+
+        else if (menuIndex == 4 && frame == 5)
+        {
+
+            /**  
+             * ----------------
+             * | Auto dim       |
+             * -----------------
+             * 
+             *  SAVE
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, auto_dim_icon_width, auto_dim_icon_height, auto_dim_icon_bits);
+            display.setFont(Serif_plain_12);
+            MenuItemSelected(main_menu_item[4], 0, true, setup_mode);
+            MenuItemSelected(main_menu_item[5], 16, false, setup_mode);
+        }
+
+        else if (menuIndex == 5 && frame == 6)
+        {
+            /** 
+             * ---------------   
+             * |SAVE|
+             * ---------------
+             *            
+             *  RESET
+             * 
+             * 
+             * */
+            display.setFont(Serif_plain_12);
+            display.drawXbm(display.getWidth() - 32, 0, save_icon_width, save_icon_height, save_icon_bits);
+            MenuItemSelected(main_menu_item[5], 0, true, setup_mode);
+            MenuItemSelected(main_menu_item[6], 16, false, setup_mode);
+        }
+        else if (menuIndex == 6 && frame == 7)
+        {
+            /** 
+             *----------------   
+             * |RESET|
+             * ---------------           
+             * SETUP
+
+             * */
+            display.setFont(Serif_plain_12);
+            display.drawXbm(display.getWidth() - 32, 0, factory_reset_icon_width, factory_reset_icon_height, factory_reset_icon_bits);
+            MenuItemSelected(main_menu_item[6], 0, true, setup_mode);
+            MenuItemSelected(main_menu_item[7], 16, false, setup_mode);
+        }
+        else if (menuIndex == 7 && frame == 8)
+        {
+            /** 
+             *----------------   
+             * |SETUP |
+             * ---------------         
+             *WIFI IP 
+             * */
+            display.setFont(Serif_plain_12);
+            display.drawXbm(display.getWidth() - 32, 0, setting_icon_width, setting_icon_height, setting_icon_bits);
+            MenuItemSelected(main_menu_item[7], 0, true, setup_mode);
+            MenuItemSelected(main_menu_item[8], 16, false, setup_mode);
+        }
+        //**
         else if (menuIndex == 1 && frame == 1)
         {
             /**
@@ -334,26 +447,6 @@ void drawMainMenu()
             else
                 MenuItemSelected(main_menu_item[1] + "OFF", 16, true, setup_mode);
         }
-
-        else if (menuIndex == 1 && frame == 2)
-        {
-            /**
-             * ---------------
-             * | LED:ON(OFF) |
-             * ---------------
-             * 
-             *  DUTY Setup
-             * 
-             */
-            drawDutyFreq();
-            display.setFont(Serif_plain_12);
-            if (mypwm.getLedState())
-                MenuItemSelected(main_menu_item[1] + "ON", 0, true, setup_mode);
-            else
-                MenuItemSelected(main_menu_item[1] + "OFF", 0, true, setup_mode);
-
-            MenuItemSelected(main_menu_item[2], 16, false, setup_mode);
-        }
         else if (menuIndex == 2 && frame == 2)
         {
 
@@ -374,22 +467,6 @@ void drawMainMenu()
 
             MenuItemSelected(main_menu_item[2], 16, true, setup_mode);
         }
-        else if (menuIndex == 2 && frame == 3)
-        {
-            /**
-             * 
-             * --------------
-             * | Duty setup |
-             * --------------
-             * 
-             *  Freq setup 
-             * 
-             */
-            display.drawXbm(display.getWidth() - 32, 0, bell_curve_width, bell_curve_height, bell_curve_bits);
-            display.setFont(Serif_plain_12);
-            MenuItemSelected(main_menu_item[2], 0, true, setup_mode);
-            MenuItemSelected(main_menu_item[3], 16, false, setup_mode);
-        }
         else if (menuIndex == 3 && frame == 3)
         {
             /**
@@ -404,21 +481,6 @@ void drawMainMenu()
             display.setFont(Serif_plain_12);
             MenuItemSelected(main_menu_item[2], 0, false, setup_mode);
             MenuItemSelected(main_menu_item[3], 16, true, setup_mode);
-        }
-        else if (menuIndex == 3 && frame == 4)
-        {
-            /**
-             *--------------
-             *| Freq setup |
-             * -------------
-             * 
-             *  Auto dim 
-             * 
-             */
-            display.drawXbm(display.getWidth() - 32, 0, frequency_icon_width, frequency_icon_height, frequency_icon_bits);
-            display.setFont(Serif_plain_12);
-            MenuItemSelected(main_menu_item[3], 0, true, setup_mode);
-            MenuItemSelected(main_menu_item[4], 16, false, setup_mode);
         }
         else if (menuIndex == 4 && frame == 4)
         {
@@ -435,52 +497,21 @@ void drawMainMenu()
             MenuItemSelected(main_menu_item[3], 0, false, setup_mode);
             MenuItemSelected(main_menu_item[4], 16, true, setup_mode);
         }
-        else if (menuIndex == 4 && frame == 5)
-        {
-
-            /**  
-             * ----------------
-             * | Auto dim       |
-             * -----------------
-             * 
-             *  SAVE
-             * 
-             * */
-            display.drawXbm(display.getWidth() - 32, 0, auto_dim_icon_width, auto_dim_icon_height, auto_dim_icon_bits);
-            display.setFont(Serif_plain_12);
-            MenuItemSelected(main_menu_item[4], 0, true, setup_mode);
-            MenuItemSelected(main_menu_item[5], 16, false, setup_mode);
-        }
         else if (menuIndex == 5 && frame == 5)
         {
+
             /** 
              *  
              * Auto dim 
              * 
              *-----------------
-             *| Factory Reset|
+             *| Save|
              * ---------------
              */
-            display.drawXbm(display.getWidth() - 32, 0, factory_reset_icon_width, factory_reset_icon_height, factory_reset_icon_bits);
+            display.drawXbm(display.getWidth() - 32, 0, save_icon_width, save_icon_height, save_icon_bits);
             display.setFont(Serif_plain_12);
             MenuItemSelected(main_menu_item[4], 0, false, setup_mode);
             MenuItemSelected(main_menu_item[5], 16, true, setup_mode);
-        }
-        else if (menuIndex == 5 && frame == 6)
-        {
-            /** 
-             * ---------------   
-             * |SAVE|
-             * ---------------
-             *            
-             *  RESET
-             * 
-             * 
-             * */
-            display.setFont(Serif_plain_12);
-            display.drawXbm(display.getWidth() - 32, 0, save_icon_width, save_icon_height, save_icon_bits);
-            MenuItemSelected(main_menu_item[5], 0, true, setup_mode);
-            MenuItemSelected(main_menu_item[6], 16, false, setup_mode);
         }
         else if (menuIndex == 6 && frame == 6)
         {
@@ -498,20 +529,6 @@ void drawMainMenu()
             MenuItemSelected(main_menu_item[5], 0, false, setup_mode);
             MenuItemSelected(main_menu_item[6], 16, true, setup_mode);
         }
-        else if (menuIndex == 6 && frame == 7)
-        {
-            /** 
-             *----------------   
-             * |RESET|
-             * ---------------           
-             * SETUP
-
-             * */
-            display.setFont(Serif_plain_12);
-            display.drawXbm(display.getWidth() - 32, 0, factory_reset_icon_width, factory_reset_icon_height, factory_reset_icon_bits);
-            MenuItemSelected(main_menu_item[6], 0, true, setup_mode);
-            MenuItemSelected(main_menu_item[7], 16, false, setup_mode);
-        }
         else if (menuIndex == 7 && frame == 7)
         {
             /** 
@@ -527,19 +544,6 @@ void drawMainMenu()
             display.drawXbm(display.getWidth() - 32, 0, setting_icon_width, setting_icon_height, setting_icon_bits);
             MenuItemSelected(main_menu_item[6], 0, false, setup_mode);
             MenuItemSelected(main_menu_item[7], 16, true, setup_mode);
-        }
-        else if (menuIndex == 7 && frame == 8)
-        {
-            /** 
-             *----------------   
-             * |SETUP |
-             * ---------------         
-             *WIFI IP 
-             * */
-            display.setFont(Serif_plain_12);
-            display.drawXbm(display.getWidth() - 32, 0, setting_icon_width, setting_icon_height, setting_icon_bits);
-            MenuItemSelected(main_menu_item[7], 0, true, setup_mode);
-            MenuItemSelected(main_menu_item[8], 16, false, setup_mode);
         }
         else if (menuIndex == 8 && frame == 8)
         {
@@ -637,6 +641,103 @@ void drawSetupMenu()
 
             MenuItemSelected(setup_menu_item[1], 16, false, setup_mode);
         }
+
+        else if (setup_menu_index == 1 && setup_frame == 2)
+        {
+            /**
+             * ---------------
+             * |PWM on delay tiem |
+             * ---------------
+             * 
+             * LED on delay timer 
+             * 
+             */
+            display.drawXbm(display.getWidth() - time_icon_width, 0, time_icon_width, time_icon_height, time_icon_bits);
+            MenuItemSelected(setup_menu_item[1], 0, true, setup_mode);
+
+            MenuItemSelected(setup_menu_item[2], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 2 && setup_frame == 3)
+        {
+            /**
+             * 
+             * --------------
+             * |LED on delay time |
+             * --------------
+             * 
+             *  ON sequence 
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, time_icon_width, time_icon_height, time_icon_bits);
+            MenuItemSelected(setup_menu_item[2], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[3], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 3 && setup_frame == 4)
+        {
+            /**
+             *--------------
+             *|  On sequence|
+             * -------------
+             * 
+             *  Screen saver
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, sequence_icon_width, sequence_icon_height, sequence_icon_bits);
+            MenuItemSelected(setup_menu_item[3], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[4], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 4 && setup_frame == 5)
+        {
+
+            /**  
+             * ----------------
+             * |  Screen Saver  |
+             * -----------------
+             * 
+             *  Duty step 
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, sleep_icon_width, sleep_icon_height, sleep_icon_bits);
+            MenuItemSelected(setup_menu_item[4], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[5], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 5 && setup_frame == 6)
+        {
+            /** 
+             * ---------------   
+             * |Duty step
+             * ---------------
+             *            
+             * Freqstep 
+             * 
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            MenuItemSelected(setup_menu_item[5], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[6], 16, false, setup_mode);
+        }
+        else if (setup_menu_index == 6 && setup_frame == 7)
+        {
+            /** 
+             * ---------- 
+             * Freq Step |
+             * ----------
+             * 
+             * Auto dim time 
+             * 
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            MenuItemSelected(setup_menu_item[6], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[7], 16, false, setup_mode);
+        }
+
+        //----------------------------
+
         else if (setup_menu_index == 1 && setup_frame == 1)
         {
 
@@ -670,22 +771,6 @@ void drawSetupMenu()
 
             MenuItemSelected(setup_menu_item[2], 16, true, setup_mode);
         }
-        else if (setup_menu_index == 1 && setup_frame == 2)
-        {
-            /**
-             * ---------------
-             * |PWM on delay tiem |
-             * ---------------
-             * 
-             * LED on delay timer 
-             * 
-             */
-            display.drawXbm(display.getWidth() - time_icon_width, 0, time_icon_width, time_icon_height, time_icon_bits);
-            MenuItemSelected(setup_menu_item[1], 0, true, setup_mode);
-
-            MenuItemSelected(setup_menu_item[2], 16, false, setup_mode);
-        }
-
         else if (setup_menu_index == 3 && setup_frame == 3)
         {
             /**
@@ -700,22 +785,6 @@ void drawSetupMenu()
             MenuItemSelected(setup_menu_item[2], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[3], 16, true, setup_mode);
         }
-        else if (setup_menu_index == 2 && setup_frame == 3)
-        {
-            /**
-             * 
-             * --------------
-             * |LED on delay time |
-             * --------------
-             * 
-             *  ON sequence 
-             * 
-             */
-            display.drawXbm(display.getWidth() - 32, 0, time_icon_width, time_icon_height, time_icon_bits);
-            MenuItemSelected(setup_menu_item[2], 0, true, setup_mode);
-            MenuItemSelected(setup_menu_item[3], 16, false, setup_mode);
-        }
-
         else if (setup_menu_index == 4 && setup_frame == 4)
         {
             /**
@@ -730,21 +799,6 @@ void drawSetupMenu()
             MenuItemSelected(setup_menu_item[3], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[4], 16, true, setup_mode);
         }
-        else if (setup_menu_index == 3 && setup_frame == 4)
-        {
-            /**
-             *--------------
-             *|  On sequence|
-             * -------------
-             * 
-             *  Screen saver
-             * 
-             */
-            display.drawXbm(display.getWidth() - 32, 0, sequence_icon_width, sequence_icon_height, sequence_icon_bits);
-            MenuItemSelected(setup_menu_item[3], 0, true, setup_mode);
-            MenuItemSelected(setup_menu_item[4], 16, false, setup_mode);
-        }
-
         else if (setup_menu_index == 5 && setup_frame == 5)
         {
             /** 
@@ -758,21 +812,6 @@ void drawSetupMenu()
             display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
             MenuItemSelected(setup_menu_item[4], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[5], 16, true, setup_mode);
-        }
-        else if (setup_menu_index == 4 && setup_frame == 5)
-        {
-
-            /**  
-             * ----------------
-             * |  Screen Saver  |
-             * -----------------
-             * 
-             *  Duty step 
-             * 
-             * */
-            display.drawXbm(display.getWidth() - 32, 0, sleep_icon_width, sleep_icon_height, sleep_icon_bits);
-            MenuItemSelected(setup_menu_item[4], 0, true, setup_mode);
-            MenuItemSelected(setup_menu_item[5], 16, false, setup_mode);
         }
         else if (setup_menu_index == 6 && setup_frame == 6)
         {
@@ -789,22 +828,21 @@ void drawSetupMenu()
             MenuItemSelected(setup_menu_item[5], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[6], 16, true, setup_mode);
         }
-        else if (setup_menu_index == 5 && setup_frame == 6)
+        else if (setup_menu_index == 7 && setup_frame == 7)
         {
             /** 
-             * ---------------   
-             * |Duty step
-             * ---------------
-             *            
-             * Freqstep 
-             * 
+            * 
+             * Freq Step 
+             *
+             * --------------
+             * auto dim time |
+             * --------------
              * 
              * */
-            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
-            MenuItemSelected(setup_menu_item[5], 0, true, setup_mode);
-            MenuItemSelected(setup_menu_item[6], 16, false, setup_mode);
+            display.drawXbm(display.getWidth() - 32, 0, auto_dim_icon_width, auto_dim_icon_height, auto_dim_icon_bits);
+            MenuItemSelected(setup_menu_item[6], 0, false, setup_mode);
+            MenuItemSelected(setup_menu_item[7], 16, true, setup_mode);
         }
-
         display.display();
     }
     else if (setup_page = 2)
@@ -962,10 +1000,9 @@ void readRotaryEncoder()
         else if (up && page == 2 && menuIndex == 7) // Setup menu
         {
             /**************************************************************************
-     * @     this is show setup menu when up
-     * *******************************************************************************
-     */
-            setup_mode = true;
+* @     this is show setup menu when up
+* *******************************************************************************
+*/
 
             Serial.printf("  setup_menu_index  %i \r\n ", setup_menu_index);
         }
@@ -1105,7 +1142,10 @@ void readRotaryEncoder()
             {
                 setup_frame--;
             }
-
+            if (setup_menu_index == 7 && setup_frame == 8)
+            {
+                setup_frame--;
+            }
             setup_last_menu_index = setup_menu_index;
             setup_menu_index--;
             if (setup_menu_index < 0)
@@ -1135,6 +1175,10 @@ void readRotaryEncoder()
         {
             up = false; //reset button
         }
+        else if (up && page == 2 && setup_menu_index == 7) // Setup menu
+        {
+            up = false; //reset button
+        }
 
         // down  Rotary encoder
         if (down && setup_page == 1) //We have turned the Rotary Encoder Clockwise
@@ -1157,15 +1201,19 @@ void readRotaryEncoder()
             {
                 setup_frame++;
             }
+            else if (setup_menu_index == 5 && setup_last_menu_index == 4)
+            {
+                setup_frame++;
+            }
 
-            else if (setup_menu_index == 5 && setup_last_menu_index == 4 && setup_frame != 6)
+            else if (setup_menu_index == 6 && setup_last_menu_index == 5 && setup_frame != 7)
             {
                 setup_frame++;
             }
 
             setup_last_menu_index = setup_menu_index;
             setup_menu_index++;
-            if (setup_menu_index == 7)
+            if (setup_menu_index == 8)
             {
                 setup_menu_index--;
             }
@@ -1188,6 +1236,10 @@ void readRotaryEncoder()
             down = false; //reset button
         }
         else if (down && setup_page == 2 && setup_menu_index == 6) //Setup
+        {
+            down = false; //reset button
+        }
+        else if (down && setup_page == 2 && setup_menu_index == 7) //Setup
         {
             down = false; //reset button
         }
@@ -1319,8 +1371,21 @@ void middle_button_process()
                 }
                 else if (page == 2)
                 {
-                    page = 1;
+                    if (save_yes_no)
+                    {
+                        DEBUG_PRINTF("go to page 3 %d\r\n", save_yes_no);
+                       
+                        flash_text("Save setting completed.", 2);
+                        page == 1;
+                    }
+                    else
+                    {
+                        DEBUG_PRINTF("back  %d\r\n", save_yes_no);
+                        flash_text("No save.", 2);
+                        page = 1;
+                    }
                 }
+
                 break;
             case 6 /*  factor reset  */:
                 if (page == 1)

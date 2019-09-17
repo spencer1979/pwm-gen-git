@@ -59,7 +59,8 @@ private:
     int16_t _oledSleepTime;
     uint16_t _ledOnDelay;
     uint16_t _pwmOnDelay;
-    uint8_t _onSequence;
+    uint8_t _turnOnPriority;
+    uint16_t _autoDimDuration;
 
     // _timerBit
     ledc_channel_config_t _pwm_channel;
@@ -67,6 +68,8 @@ private:
     ledc_timer_bit_t _get_timer_bit(uint32_t freq);
     //Resolution of PWM duty (0-  2**timer_bit_ -1 )
     uint16_t _dutyRes;
+
+    void _CreateFactorySetting(void);
 
 public:
     uint8_t bSaveConfig();

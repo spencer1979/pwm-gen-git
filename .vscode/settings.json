@@ -43,6 +43,7 @@
         "typeinfo": "cpp",
         "string": "cpp",
         "iostream": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "unordered_set": "cpp"
     }
 }
