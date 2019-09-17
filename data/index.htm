@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, minimal-ui">
+    <script src="js/jquery-2.2.4.min.js"></script>
+    <script src="js/jquery.mobile.min.js"></script>
+    <script src="js/gauge.min.js"></script>
+
+    <link rel="stylesheet" href="css/jquery.mobile.min.css" />
+    <title></title>
+</head>
+
+<style>
+    #pageone .ui-header {
+        background: rgba(218, 218, 218, 1.00);
+        height: 26px;
+        border-width: 0px;
+        border-radius: 0px;
+        margin: 0px;
+        padding-top: 0px;
+        padding-bottom: 0px;
+    }
+    
+    #pageone .ui-footer {
+        background: rgba(218, 218, 218, 1.00);
+        height: 26px;
+        border-width: 0px;
+        border-radius: 5px;
+        padding-top: 0px;
+        margin: 0px;
+    }
+    
+    #pageone {
+        background: rgba(255, 255, 255, 1.00);
+        padding-top: 26px;
+        margin-top: 0px;
+    }
+    
+    .acol .ui-collapsible-heading-collapsed>.ui-collapsible {
+        background: rgb(6, 94, 153);
+    }
+    
+    #status {
+        height: 11px;
+        line-height: 17px;
+        border-radius: 10px;
+        padding-top: 0px;
+        margin: 0px
+    }
+</style>
+
+
+<body>
+
+    <div data-role="page" id="pageone">
+        <!-- header -->
+        <div data-role="header" data-position="fixed" data-fullscreen="true">
+            <img src="imgs/pilogo.png" width="200" height="25" id="logo" alt="" style="padding-top:0px;margin:0px">
+            <a class="ui-btn-right" id="status">info</a>
+        </div>
+        <!-- /header -->
+
+        <!--Meter-->
+        <div role="main" class="ui-content">
+            <!--Meter-->
+            <div class="ui-field-contain" align="center">
+                <canvas id="FreqMeter"></canvas>
+                <canvas id="DutyMeter"></canvas>
+                <script src="js/mygauge.js"></script>
+            </div>
+            <!--/Meter-->
+
+            <!--Freq input-->
+            <div class="ui-field-contain" id="div-1">
+                <label for="slider">Frequency (kHz):</label>
+                <input type="range" name="data-0" id="slider-1" value="10" min="10" max="30" step="0.1" data-highlight="true" data-theme="b" data-track-theme="b" />
+            </div>
+            <!--/Freq input-->
+            <!--Duty input-->
+            <div class="ui-field-contain" id="div-2">
+                <label for="slider">Duty cycle (%):</label>
+                <input type="range" name="data-1" id="slider-2" value="1" min="1" max="100" step="1" data-highlight="true" data-theme="b" data-track-theme="b" />
+            </div>
+            <!--/Duty input-->
+
+
+            <div class="ui-grid-a " align="center">
+                <!--PWM Switch-->
+                <label for="btn-3" style="display: inline;font-size: 15px;vertical-align: middle "> PWM:
+                </label>
+                <select name="data-3" id="btn-3" data-role="flipswitch" data-mini='true'>
+                    <option value=0 selected>OFF</option>
+                    <option value=1>ON</option>
+                </select>
+                <!--/PWM Switch-->
+                &nbsp;
+                <!--LED Switch-->
+                <label for="btn-4" style="display: inline;font-size: 14px;vertical-align:middle ">LED:
+                </label>
+                <select name="data-4" id="btn-4" data-role="flipswitch" data-mini='true'>
+                    <option value=0 selected>OFF</option>
+                    <option value=1>ON</option>
+                </select>
+
+                <!--/LED  Switch-->
+
+            </div>
+
+            <!--msg_board-->
+            <div class="ui-field-contain">
+                <ul id="msg_board" style=" padding-left:10px;padding-top: 0px;padding-bottom: 0px;padding-right: 0px ;margin: 1px">
+                </ul>
+            </div>
+            <!--/msg_board-->
+            <fieldset data-role="controlgroup" data-mini="true" style="text-align:center;">
+                <!--Auto freq loop -->
+                <div class="ui-checkbox">
+                    <label for="checkbox-enhanced" class="ui-btn ui-corner-all ui-btn-inherit ui-btn-icon-left ui-checkbox-off">Auto
+                        step frequency (10kHz to 30KHz ,step 0.5KHz 2 sec.)</label>
+                    <input type="checkbox" name="checkbox-enhanced" id="Freq_step_chkbox" data-enhanced="true">
+                </div>
+                <!--/Auto freq loop -->
+                <!--Auto duty loop -->
+                <div class="ui-checkbox">
+                    <label for="checkbox-enhanced" class="ui-btn ui-corner-all ui-btn-inherit ui-btn-icon-left ui-checkbox-off">Auto
+                        step
+                        Duty Cycle (1% to 100% ,step 1% ,2 sec.)</label>
+                    <input type="checkbox" name="checkbox-enhanced" id="Duty_step_chkbox" data-enhanced="true">
+                </div>
+                <!--/Auto duty loop -->
+            </fieldset>
+
+            <!--Save default-->
+            <a href="#" id='btn-0' name='btn-0' class="ui-btn ui-btn-a ui-icon-check ui-btn-icon-left ui-shadow ui-corner-all" data-mini='true'>Save as default</a>
+            <!--/Save default-->
+            <!-- /content -->
+            <!-- footer -->
+            <div data-role="footer" data-position="fixed" data-fullscreen="true">
+
+                <div class="ui-grid-a">
+                    <div class="ui-block-a" style="text-align: left ;font-size:14px">
+                        PWM signal generator App
+                    </div>
+                    <div class="ui-block-b" style="text-align:right">
+                        <p id="mytest" style="font-size:10px ;padding-top: 5px;margin:0px">&copy; 2019 Spencer Chen &nbsp;
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <!-- /footer -->
+        </div>
+        <!-- /page -->
+
+</body>
+<script src="js/myapp.js"></script>
+
+</html>
