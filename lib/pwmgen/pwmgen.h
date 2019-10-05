@@ -34,6 +34,12 @@
 #ifndef DEBUG_PWM
 #define DEBUG_PWM(...)
 #endif
+typedef enum
+{
+    PWM_OK = 0,
+    PWM_ERR,
+
+} pwm_err;
 
 typedef enum
 {
@@ -41,7 +47,7 @@ typedef enum
     LED_ON_THEN_PWM_ON,
     PWM_ON_THEN_LED_ON
 
-} PWM_on_sequencr_t;
+} PWM_on_sequence_t;
 
 class Pwmgen
 {
@@ -69,12 +75,14 @@ private:
     //Resolution of PWM duty (0-  2**timer_bit_ -1 )
     uint16_t _dutyRes;
 
-    void _CreateFactorySetting(void);
+    pwm_err _createDefaultSettings(const char *file); // create def.json and user.json file
 
 public:
-    uint8_t bSaveConfig();
-    uint8_t bResetConfig(void);
-    uint8_t bLoadConfig(void);
+    // uint8_t settingConfig( PWM_config_t config);
+
+    pwm_err resetSettings(void);            // load def.json to user.json
+    pwm_err saveSettings(void);             //save setting to user.json
+    pwm_err loadSettings(const char *file); //load "user,json" to system
 
     bool begin(); // load config
     float getDuty(void);
@@ -83,12 +91,20 @@ public:
     uint32_t getFreqStep(void);
     uint8_t getPwmState(void);
     uint8_t getLedState(void);
+    uint16_t getLedOnDealy();
+    uint16_t getPwmOnDealy();
 
+    PWM_on_sequence_t getOnPriority(void);
+
+    void setOnPriority(uint8_t type);
     void setDuty(float duty);
     void setDutyStep(float dutyStep);
 
     void setFreq(uint32_t freq);
     void setFreqStep(uint32_t freqStep);
+
+    void setLedOnDealy(uint16_t onDelay);
+    void setPwmOnDealy(uint16_t onDelay);
 
     void setPwmState(uint8_t pwmState);
     void setLedState(uint8_t ledState);

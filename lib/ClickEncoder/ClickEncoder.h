@@ -19,19 +19,19 @@
 
 // ----------------------------------------------------------------------------
 
-#define ENC_NORMAL        (1 << 1)   // use Peter Danneger's decoder
-#define ENC_FLAKY         (1 << 2)   // use Table-based decoder
+#define ENC_NORMAL (1 << 1) // use Peter Danneger's decoder
+#define ENC_FLAKY (1 << 2)  // use Table-based decoder
 
 // ----------------------------------------------------------------------------
 
 #ifndef ENC_DECODER
-#  define ENC_DECODER     ENC_NORMAL
+#define ENC_DECODER ENC_NORMAL
 #endif
 
 #if ENC_DECODER == ENC_FLAKY
-#  ifndef ENC_HALFSTEP
-#    define ENC_HALFSTEP  1        // use table for half step per default
-#  endif
+#ifndef ENC_HALFSTEP
+#define ENC_HALFSTEP 1 // use table for half step per default
+#endif
 #endif
 
 // ----------------------------------------------------------------------------
@@ -39,7 +39,8 @@
 class ClickEncoder
 {
 public:
-  typedef enum Button_e {
+  typedef enum Button_e
+  {
     Open = 0,
     Closed,
 
@@ -81,7 +82,8 @@ public:
   void setAccelerationEnabled(const bool &a)
   {
     accelerationEnabled = a;
-    if (accelerationEnabled == false) {
+    if (accelerationEnabled == false)
+    {
       acceleration = 0;
     }
   }
@@ -95,18 +97,19 @@ private:
   const uint8_t pinA;
   const uint8_t pinB;
   const uint8_t pinBTN;
+  uint8_t steps;
   const bool pinsActive;
+  bool doubleClickEnabled;
+  bool accelerationEnabled;
   volatile int16_t delta;
   volatile int16_t last;
-  uint8_t steps;
   volatile uint16_t acceleration;
-  bool accelerationEnabled;
+
 #if ENC_DECODER != ENC_NORMAL
   static const int8_t table[16];
 #endif
 #ifndef WITHOUT_BUTTON
   volatile Button button;
-  bool doubleClickEnabled;
   uint16_t keyDownTicks = 0;
   uint8_t doubleClickTicks = 0;
   unsigned long lastButtonCheck = 0;

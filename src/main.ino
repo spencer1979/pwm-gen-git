@@ -8,6 +8,7 @@
  * @copyright Copyright (c) 2019
  * 
  */
+
 #include <math.h>
 #include <Arduino.h>
 #include <SSD1306.h>
@@ -44,7 +45,7 @@
 // Rotary Encoder GPIO Pin
 #define ROTARYENCODER_DEFAULT_A_PIN 27
 #define ROTARYENCODER_DEFAULT_B_PIN 26
-#define ROTARYENCODER_DEFAULT_BUT_PIN 23
+#define ROTARYENCODER_DEFAULT_BUT_PIN 2
 #define ROTARYENCODER_DEFAULT_STEPS 2
 // DEBUG OUTPUT
 #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
@@ -52,29 +53,33 @@
 #ifndef DEBUG_PRINTF
 #define DEBUG_PRINTF (...)
 #endif
-
+//rotary encoder var
 int menuIndex = 0;
 int frame = 1;
 int page = 1;
 int lastmenuIndex = 0;
-//
+//main menu var
 bool setup_mode = false;
 int setup_page = 1;
 int setup_frame = 1;
 int setup_menu_index = 0;
 int setup_last_menu_index = 0;
-//
+// setup menu var
 bool up = false;
 bool down = false;
 bool middle_click = false; // button click
 bool middle_held = false;  // button hold
 int16_t last, value;
 bool save_yes_no = false;
+
 //oled sleep counter
 bool isScreenSleep = false;
 uint16_t ScreenIdleTime = 0;
 bool ScreenSleepEnable = false;
-
+//Auto dim duty
+float AutoDimDuty;
+bool AutoDimFlag = false;
+bool DutyDirection = true;
 // menu Text
 String main_menu_item[9] = {"PWM:", "LED:", "Duty SETUP", "Freq SETUP", "AUTO DIM", "SAVE", "RESET ", "SETUP", "WIFI IP"};
 String setup_menu_item[8] = {"Back to Main", "PWM ON delay", "LED On delay", "Turn-On Priority", "OLED Sleep", "Duty Step", "Freq Step ", "Auto dim time"};
@@ -92,7 +97,7 @@ enum APP_ID
     ID_FREQ_STEP,
     ID_DUTY_STEP
 };
-//create  struct
+//create pwm gen object
 Pwmgen mypwm;
 // object
 SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);
@@ -104,13 +109,15 @@ IPAddress apIP(10, 0, 0, 1);
 //create Timer for Rotary encoder
 hw_timer_t *encoderTimer = NULL;
 
-//FreeRTOS software Timer
+//FreeRTOS software Timer for oled sleep
 BaseType_t xSleepTimer;
+BaseType_t xAutoDimTimer;
 TimerHandle_t xSleepTimer_Handler = NULL;
-
+TimerHandle_t xAutoDimTimer_Handler = NULL;
 volatile SemaphoreHandle_t oledSleepTimerSemaphore;
+volatile SemaphoreHandle_t autoDimTimerSemaphore;
 portMUX_TYPE mymux = portMUX_INITIALIZER_UNLOCKED;
-
+//FreeRtos task handle
 TaskHandle_t xDisplayTask_Handler;
 
 //FreeRTOS Queue
@@ -131,29 +138,32 @@ void setup()
     snprintf(ssid, 23, "PWMGEN-%04X%08X", chip, (uint32_t)chipid);
     //The chip ID is essentially its MAC address(length: 6 bytes).
     Serial.println(ssid); //print Low 4bytes.
-    // SPIFFS.begin();
-    // if (SPIFFS.format())
-    // {
-    //     DEBUG_PRINTF("\r\nformat ok!\r\n");
-    // }
+                          //   SPIFFS.begin();
+                          //     if (SPIFFS.format())
+                          //     {
+                          //          DEBUG_PRINTF("\r\nformat ok!\r\n");
+                          //      }
 
     if (mypwm.begin())
     {
-        DEBUG_PRINTF("\r\nSystem begin  \r\n");
 
-       // mypwm.bResetConfig();
+        DEBUG_PRINTF("\r\nSystem begin  \r\n");
+        xTaskCreatePinnedToCore(vDisplayTask, "Dispaly Task", 6000, NULL, 3, NULL, 1);
     }
     else
     {
-        DEBUG_PRINTF("\r\nCan't not begin \r\n");
-    }
+        display.init();
+        display.clear();
+        display.drawString(0, 0, "Load data error!!");
+        display.display();
 
-    xTaskCreatePinnedToCore(vDisplayTask, "Dispaly Task", 6000, NULL, 3, NULL, 1);
+        //     // while (1)
+        //     //     ;
+    }
 }
 
 void loop()
 {
-
     delay(2000);
 }
 
@@ -181,8 +191,10 @@ void vDisplayTask(void *arg)
     timerAlarmWrite(encoderTimer, 1000, true);
     // Start an alarm
     timerAlarmEnable(encoderTimer);
-    TickType_t timer_periods;
 
+    TickType_t timer_periods;
+    //Auto dim timer
+    xAutoDimTimer_Handler = xTimerCreate("Auto dim timer", pdMS_TO_TICKS(100), pdTRUE, (void *)1, &AutoDimCallBackFun);
     // oledSleepTimerSemaphore = xSemaphoreCreateBinary();
     if ((bool)mypwm.getOledSleepTime() == false)
     {
@@ -210,10 +222,20 @@ void vDisplayTask(void *arg)
     {
 
         CheckScreenSleep();
-        drawMainMenu();
         readRotaryEncoder();
         middle_button_process();
-        taskYIELD();
+        if (setup_mode)
+        {
+            drawSetupMenu();
+            SetupMenu();
+        }
+        else
+        {
+            drawMainMenu();
+            MainMenu();
+        }
+
+        //taskYIELD();
     }
     vTaskDelete(NULL);
 }
@@ -279,7 +301,7 @@ void drawDutyFreq()
 void drawMainMenu()
 {
 
-    if (page == 1) //show page 1 menuCOM20
+    if (page == 1) //show page 1 menu
     {
         char buffer[50];
         display.clear();
@@ -602,7 +624,6 @@ void drawMainMenu()
             confirmDisplay(save_yes_no);
             display.display();
         case 7 /* SETUP*/:
-            drawSetupMenu();
 
         case 8 /* WiFI iP */:
             break;
@@ -885,6 +906,7 @@ void readRotaryEncoder()
 
         last = value / 2;
         up = true;
+        Serial.printf("menuindex is %d\r\n", menuIndex);
         vTaskDelay(150 / portTICK_RATE_MS);
     }
     else if (value / 2 < last)
@@ -910,342 +932,611 @@ void readRotaryEncoder()
 
         last = value / 2;
         down = true;
+        Serial.printf("menuindex is %d\r\n", menuIndex);
         vTaskDelay(150 / portTICK_RATE_MS);
-    }
-
-    if (!setup_mode)
-    {
-
-        // up Rotary encoder
-        if (up && page == 1)
-        {
-            up = false;
-            if (menuIndex == 1 && frame == 2)
-            {
-                frame--;
-            }
-
-            if (menuIndex == 2 && frame == 3)
-            {
-                frame--;
-            }
-            if (menuIndex == 3 && frame == 4)
-            {
-                frame--;
-            }
-            if (menuIndex == 4 && frame == 5)
-            {
-                frame--;
-            }
-            if (menuIndex == 5 && frame == 6)
-            {
-                frame--;
-            }
-            if (menuIndex == 6 && frame == 7)
-            {
-                frame--;
-            }
-            if (menuIndex == 7 && frame == 8)
-            {
-                frame--;
-            }
-
-            lastmenuIndex = menuIndex;
-            menuIndex--;
-            if (menuIndex < 0)
-            {
-                menuIndex = 0;
-            }
-        }
-
-        else if (up && page == 2 && menuIndex == 2) //Duty adjust
-        {
-            up = false; //reset button
-            float up_duty = 0;
-            up_duty = mypwm.getDuty() + mypwm.getDutyStep();
-            if (up_duty >= 100)
-                up_duty = 100;
-
-            DEBUG_PRINTF("up_duty :%f\r\n", up_duty);
-            mypwm.setDuty(up_duty);
-        }
-        else if (up && page == 2 && menuIndex == 3) //Freq adjust
-        {
-            uint32_t up_freq = 0;
-            up = false; //reset button
-            up_freq = mypwm.getFreq() + mypwm.getFreqStep();
-
-            if (up_freq >= MAX_ADJUST_FREQ)
-                up_freq = MAX_ADJUST_FREQ;
-
-            DEBUG_PRINTF("up_freq :%i\r\n", up_freq);
-            mypwm.setFreq(up_freq);
-        }
-        else if (up && page == 2 && menuIndex == 4) // auto dim
-        {
-            up = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-
-        else if (up && page == 2 && menuIndex == 5) // save setting
-        {
-            up = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-        else if (up && page == 2 && menuIndex == 6) // Reset
-        {
-            up = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-        else if (up && page == 2 && menuIndex == 7) // Setup menu
-        {
-            /**************************************************************************
-* @     this is show setup menu when up
-* *******************************************************************************
-*/
-
-            Serial.printf("  setup_menu_index  %i \r\n ", setup_menu_index);
-        }
-        else if (up && page == 2 && menuIndex == 8) // Wifi ip
-        {
-            up = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-
-        // down  Rotary encoder
-        if (down && page == 1) //We have turned the Rotary Encoder Clockwise
-        {
-
-            down = false;
-            if (menuIndex == 1 && lastmenuIndex == 0)
-            {
-                frame++;
-            }
-            else if (menuIndex == 2 && lastmenuIndex == 1)
-            {
-                frame++;
-            }
-            else if (menuIndex == 3 && lastmenuIndex == 2)
-            {
-                frame++;
-            }
-            else if (menuIndex == 4 && lastmenuIndex == 3)
-            {
-                frame++;
-            }
-
-            else if (menuIndex == 5 && lastmenuIndex == 4)
-            {
-                frame++;
-            }
-            else if (menuIndex == 6 && lastmenuIndex == 5)
-            {
-                frame++;
-            }
-            else if (menuIndex == 7 && lastmenuIndex == 6 && frame != 8)
-            {
-                frame++;
-            }
-
-            lastmenuIndex = menuIndex;
-            menuIndex++;
-            if (menuIndex == 9)
-            {
-                menuIndex--;
-            }
-        }
-        else if (down && page == 2 && menuIndex == 2) // descrease Duty
-        {
-            down = false; //reset button
-            float down_duty = 0;
-
-            down_duty = mypwm.getDuty() - mypwm.getDutyStep();
-
-            if (down_duty <= MIN_DUTY_STEP)
-                down_duty = MIN_DUTY_STEP;
-
-            DEBUG_PRINTF("down_duty :%f\r\n", down_duty);
-            mypwm.setDuty(down_duty);
-        }
-        else if (down && page == 2 && menuIndex == 3) // descrease freq
-        {
-            down = false; //reset button
-            uint32_t down_freq = 0;
-
-            down_freq = mypwm.getFreq() - mypwm.getFreqStep();
-
-            if (down_freq <= MIN_ADJUST_FREQ)
-                down_freq = MIN_ADJUST_FREQ;
-
-            DEBUG_PRINTF("down_freq :%i\r\n", down_freq);
-            mypwm.setFreq(down_freq);
-        }
-
-        else if (down && page == 2 && menuIndex == 4) // auto dim
-        {
-            down = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-
-        else if (down && page == 2 && menuIndex == 5) // save default
-        {
-            down = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-        else if (down && page == 2 && menuIndex == 6) //reset
-        {
-            down = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-        else if (down && page == 2 && menuIndex == 7) //Setup
-        {
-            /**************************************************************************
-     * @     this is show setup menu when down 
-     * *******************************************************************************
-     */
-            setup_mode = true;
-        }
-        else if (down && page == 2 && menuIndex == 8) //wifi ip
-        {
-            down = false; //reset button
-            save_yes_no = !save_yes_no;
-        }
-    }
-    else
-    {
-        // up Rotary encoder
-        if (up && setup_page == 1)
-        {
-            up = false;
-            if (setup_menu_index == 1 && setup_frame == 2)
-            {
-                setup_frame--;
-            }
-
-            if (setup_menu_index == 2 && setup_frame == 3)
-            {
-                setup_frame--;
-            }
-            if (setup_menu_index == 3 && setup_frame == 4)
-            {
-                setup_frame--;
-            }
-            if (setup_menu_index == 4 && setup_frame == 5)
-            {
-                setup_frame--;
-            }
-            if (setup_menu_index == 5 && setup_frame == 6)
-            {
-                setup_frame--;
-            }
-            if (setup_menu_index == 6 && setup_frame == 7)
-            {
-                setup_frame--;
-            }
-            if (setup_menu_index == 7 && setup_frame == 8)
-            {
-                setup_frame--;
-            }
-            setup_last_menu_index = setup_menu_index;
-            setup_menu_index--;
-            if (setup_menu_index < 0)
-            {
-                setup_menu_index = 0;
-            }
-        }
-
-        else if (up && page == 2 && setup_menu_index == 2) //increase Duty
-        {
-            up = false; //reset button
-        }
-        else if (up && page == 2 && setup_menu_index == 3) //increase Freq
-        {
-
-            up = false; //reset button
-        }
-        else if (up && page == 2 && setup_menu_index == 4) // save setting
-        {
-            up = false; //reset button
-        }
-        else if (up && page == 2 && setup_menu_index == 5) // Reset
-        {
-            up = false; //reset button
-        }
-        else if (up && page == 2 && setup_menu_index == 6) // Setup menu
-        {
-            up = false; //reset button
-        }
-        else if (up && page == 2 && setup_menu_index == 7) // Setup menu
-        {
-            up = false; //reset button
-        }
-
-        // down  Rotary encoder
-        if (down && setup_page == 1) //We have turned the Rotary Encoder Clockwise
-        {
-
-            down = false;
-            if (setup_menu_index == 1 && setup_last_menu_index == 0)
-            {
-                setup_frame++;
-            }
-            else if (setup_menu_index == 2 && setup_last_menu_index == 1)
-            {
-                setup_frame++;
-            }
-            else if (setup_menu_index == 3 && setup_last_menu_index == 2)
-            {
-                setup_frame++;
-            }
-            else if (setup_menu_index == 4 && setup_last_menu_index == 3)
-            {
-                setup_frame++;
-            }
-            else if (setup_menu_index == 5 && setup_last_menu_index == 4)
-            {
-                setup_frame++;
-            }
-
-            else if (setup_menu_index == 6 && setup_last_menu_index == 5 && setup_frame != 7)
-            {
-                setup_frame++;
-            }
-
-            setup_last_menu_index = setup_menu_index;
-            setup_menu_index++;
-            if (setup_menu_index == 8)
-            {
-                setup_menu_index--;
-            }
-        }
-
-        else if (down && setup_page == 2 && setup_menu_index == 2) // descrease Duty
-        {
-            down = false; //reset button
-        }
-        else if (down && setup_page == 2 && setup_menu_index == 3) // descrease freq
-        {
-            down = false; //reset button
-        }
-        else if (down && setup_page == 2 && setup_menu_index == 4) // save default
-        {
-            down = false; //reset button
-        }
-        else if (down && setup_page == 2 && setup_menu_index == 5) //reset
-        {
-            down = false; //reset button
-        }
-        else if (down && setup_page == 2 && setup_menu_index == 6) //Setup
-        {
-            down = false; //reset button
-        }
-        else if (down && setup_page == 2 && setup_menu_index == 7) //Setup
-        {
-            down = false; //reset button
-        }
     }
 }
 
+void SetupMenu(void)
+{
+    // up Rotary encoder
+    if (up && setup_page == 1)
+    {
+        up = false;
+        if (setup_menu_index == 1 && setup_frame == 2)
+        {
+            setup_frame--;
+        }
+
+        if (setup_menu_index == 2 && setup_frame == 3)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 3 && setup_frame == 4)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 4 && setup_frame == 5)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 5 && setup_frame == 6)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 6 && setup_frame == 7)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 7 && setup_frame == 8)
+        {
+            setup_frame--;
+        }
+        setup_last_menu_index = setup_menu_index;
+        setup_menu_index--;
+        if (setup_menu_index < 0)
+        {
+            setup_menu_index = 0;
+        }
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 2) //increase Duty
+    {
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 3) //increase Freq
+    {
+
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 4) // save setting
+    {
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 5) // Reset
+    {
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 6) // Setup menu
+    {
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 7) // Setup menu
+    {
+        up = false; //reset button
+    }
+
+    // down  Rotary encoder
+    if (down && setup_page == 1) //We have turned the Rotary Encoder Clockwise
+    {
+
+        down = false;
+        if (setup_menu_index == 1 && setup_last_menu_index == 0)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 2 && setup_last_menu_index == 1)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 3 && setup_last_menu_index == 2)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 4 && setup_last_menu_index == 3)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 5 && setup_last_menu_index == 4)
+        {
+            setup_frame++;
+        }
+
+        else if (setup_menu_index == 6 && setup_last_menu_index == 5 && setup_frame != 7)
+        {
+            setup_frame++;
+        }
+
+        setup_last_menu_index = setup_menu_index;
+        setup_menu_index++;
+        if (setup_menu_index == 8)
+        {
+            setup_menu_index--;
+        }
+    }
+
+    else if (down && setup_page == 2 && setup_menu_index == 2) // descrease Duty
+    {
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 3) // descrease freq
+    {
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 4) // save default
+    {
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 5) //reset
+    {
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 6) //Setup
+    {
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 7) //Setup
+    {
+        down = false; //reset button
+    }
+
+    //button clicked
+    if (middle_click) //middle_click Button is Pressed
+    {
+
+        middle_click = false; //middle_click Button is hold
+
+        switch (setup_menu_index)
+        {
+        case 0: //back to main menu
+
+            DEBUG_PRINTF("go to main menu %d \r\n", setup_menu_index);
+            setup_mode = false;
+            setup_menu_index = 0;
+            menuIndex = 7;
+            page = 1;
+
+            break;
+        case 1:
+
+            /* code */
+            break;
+        case 2:
+            /* code */
+            break;
+        case 3:
+            /* code */
+            break;
+        case 4:
+            /* code */
+            break;
+        case 5:
+            /* code */
+            break;
+        case 6:
+            /* code */
+            break;
+        }
+    }
+}
+// main menu mode
+void MainMenu(void)
+{
+    static float LastDuty = 0;
+    float AutoDimDuty;
+
+    // up Rotary encoder
+    if (up && page == 1)
+    {
+        up = false;
+        if (menuIndex == 1 && frame == 2)
+        {
+            frame--;
+        }
+
+        if (menuIndex == 2 && frame == 3)
+        {
+            frame--;
+        }
+        if (menuIndex == 3 && frame == 4)
+        {
+            frame--;
+        }
+        if (menuIndex == 4 && frame == 5)
+        {
+            frame--;
+        }
+        if (menuIndex == 5 && frame == 6)
+        {
+            frame--;
+        }
+        if (menuIndex == 6 && frame == 7)
+        {
+            frame--;
+        }
+        if (menuIndex == 7 && frame == 8)
+        {
+            frame--;
+        }
+
+        lastmenuIndex = menuIndex;
+        menuIndex--;
+        if (menuIndex < 0)
+        {
+            menuIndex = 0;
+        }
+    }
+
+    else if (up && page == 2 && menuIndex == 2) //Duty adjust
+    {
+        up = false; //reset button
+        float up_duty = 0;
+        up_duty = mypwm.getDuty() + mypwm.getDutyStep();
+        if (up_duty >= 100)
+            up_duty = 100;
+
+        DEBUG_PRINTF("up_duty :%f\r\n", up_duty);
+        mypwm.setDuty(up_duty);
+    }
+    else if (up && page == 2 && menuIndex == 3) //Freq adjust
+    {
+        uint32_t up_freq = 0;
+        up = false; //reset button
+        up_freq = mypwm.getFreq() + mypwm.getFreqStep();
+
+        if (up_freq >= MAX_ADJUST_FREQ)
+            up_freq = MAX_ADJUST_FREQ;
+
+        DEBUG_PRINTF("up_freq :%i\r\n", up_freq);
+        mypwm.setFreq(up_freq);
+    }
+    else if (up && page == 2 && menuIndex == 4) // auto dim
+    {
+        up = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+
+    else if (up && page == 2 && menuIndex == 5) // save setting
+    {
+        up = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+    else if (up && page == 2 && menuIndex == 6) // Reset
+    {
+        up = false; //reset button
+        save_yes_no = !save_yes_no;
+        Serial.printf("menuindex %d \r\n", menuIndex);
+    }
+    else if (up && page == 2 && menuIndex == 7) // Setup menu
+    {
+
+        up = false; //reset button
+    }
+    else if (up && page == 2 && menuIndex == 8) // Wifi ip
+    {
+        up = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+
+    // down  Rotary encoder
+    if (down && page == 1) //We have turned the Rotary Encoder Clockwise
+    {
+
+        down = false;
+        if (menuIndex == 1 && lastmenuIndex == 0)
+        {
+            frame++;
+        }
+        else if (menuIndex == 2 && lastmenuIndex == 1)
+        {
+            frame++;
+        }
+        else if (menuIndex == 3 && lastmenuIndex == 2)
+        {
+            frame++;
+        }
+        else if (menuIndex == 4 && lastmenuIndex == 3)
+        {
+            frame++;
+        }
+
+        else if (menuIndex == 5 && lastmenuIndex == 4)
+        {
+            frame++;
+        }
+        else if (menuIndex == 6 && lastmenuIndex == 5)
+        {
+            frame++;
+        }
+        else if (menuIndex == 7 && lastmenuIndex == 6 && frame != 8)
+        {
+            frame++;
+        }
+
+        lastmenuIndex = menuIndex;
+        menuIndex++;
+        if (menuIndex == 9)
+        {
+            menuIndex--;
+        }
+    }
+    else if (down && page == 2 && menuIndex == 2) // descrease Duty
+    {
+        down = false; //reset button
+        float down_duty = 0;
+
+        down_duty = mypwm.getDuty() - mypwm.getDutyStep();
+
+        if (down_duty <= MIN_DUTY_STEP)
+            down_duty = MIN_DUTY_STEP;
+
+        DEBUG_PRINTF("down_duty :%f\r\n", down_duty);
+        mypwm.setDuty(down_duty);
+    }
+    else if (down && page == 2 && menuIndex == 3) // descrease freq
+    {
+        down = false; //reset button
+        uint32_t down_freq = 0;
+
+        down_freq = mypwm.getFreq() - mypwm.getFreqStep();
+
+        if (down_freq <= MIN_ADJUST_FREQ)
+            down_freq = MIN_ADJUST_FREQ;
+
+        DEBUG_PRINTF("down_freq :%i\r\n", down_freq);
+        mypwm.setFreq(down_freq);
+    }
+
+    else if (down && page == 2 && menuIndex == 4) // auto dim
+    {
+        down = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+    else if (page == 3 && menuIndex == 4) //
+    {
+
+        if (AutoDimFlag)
+        {
+            if (mypwm.getDuty() >= 100)
+            {
+                DutyDirection = false;
+            }
+            else if (mypwm.getDuty() <= MIN_DUTY_STEP)
+            {
+                DutyDirection = true;
+            }
+            DEBUG_PRINTF(" Duty Direction :%i\r\n", DutyDirection);
+            AutoDimFlag = false;
+            if (DutyDirection)
+            {
+                AutoDimDuty = mypwm.getDuty() + mypwm.getDutyStep();
+            }
+            else
+            {
+                AutoDimDuty = mypwm.getDuty() - mypwm.getDutyStep();
+            }
+
+            mypwm.setDuty(AutoDimDuty);
+        }
+        char temp[30];
+        snprintf(temp, sizeof(temp), "Duty Cycle :%.1f%%", mypwm.getDuty());
+        display.clear();
+        display.setColor(WHITE);
+        display.drawProgressBar(0, 0, display.getWidth()-1, display.getHeight()-13, mypwm.getDuty());
+        display.setTextAlignment(TEXT_ALIGN_CENTER);
+
+        display.setFont(Serif_plain_8);
+        display.drawString(63 , 20 , temp);
+        display.display();
+        // start timer
+    }
+
+    else if (down && page == 2 && menuIndex == 5) // save default
+    {
+        down = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+    else if (down && page == 2 && menuIndex == 6) //reset
+    {
+        down = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+    else if (down && page == 2 && menuIndex == 7) //enter Setup mode
+    {
+    }
+    else if (down && page == 2 && menuIndex == 8) //wifi ip
+    {
+        down = false; //reset button
+        save_yes_no = !save_yes_no;
+    }
+
+    if (middle_click)
+    {
+        middle_click = false;
+        //main menu
+        switch (menuIndex)
+        {
+        case 0 /* PWM on off */:
+
+            if (mypwm.getLedState() == 0)
+            {
+                if (mypwm.getOnPriority() == INDEPENDENT)
+                {
+                    //vTaskDelay(mypwm.getPwmOnDealy / portTICK_PERIOD_MS);
+                }
+                else if (mypwm.getOnPriority() == LED_ON_THEN_PWM_ON)
+                {
+                }
+                else if (mypwm.getOnPriority() == PWM_ON_THEN_LED_ON)
+                {
+                }
+            }
+            else
+            {
+                mypwm.setPwmState(0);
+            }
+
+            break;
+
+        case 1 /* LED on off*/:
+
+            // if (page == 1)
+            // {
+
+            mypwm.setLedState(!mypwm.getLedState());
+            //  }
+
+            break;
+        case 2 /* Duty setup  */:
+            if (page == 1)
+            {
+                page = 2;
+            }
+            else if (page == 2)
+            {
+                page = 1;
+            }
+
+            break;
+        case 3 /* Freq setup*/:
+            if (page == 1)
+            {
+                page = 2;
+            }
+            else if (page == 2)
+            {
+                page = 1;
+            }
+            break;
+        case 4 /* Auto dim */:
+            if (page == 1)
+            {
+                page = 2;
+            }
+            else if (page == 2)
+            {
+                if (save_yes_no)
+                {
+
+                    page = 3;
+                    DEBUG_PRINTF("go page %d\r\n", page);
+
+                    // start timer
+                    mypwm.setPwmState(1);
+                    mypwm.setLedState(1);
+                    if (xTimerStart(xAutoDimTimer_Handler, 10) == pdTRUE)
+                    {
+                        LastDuty = mypwm.getDuty();
+                        AutoDimDuty = mypwm.getDuty();
+                        DEBUG_PRINTF("AutoDim Timer Start  %d\r\n", xAutoDimTimer_Handler);
+                    }
+                    //AutoDimDuty=mypwm.getDuty();
+
+                    save_yes_no = false;
+                }
+                else
+                {
+
+                    page = 1;
+                }
+            }
+            else if (page == 3)
+            {
+                //stop timer
+                //set duty
+                mypwm.setPwmState(0);
+                mypwm.setLedState(0);
+                if (xTimerStop(xAutoDimTimer_Handler, 10) == pdTRUE)
+                {
+
+                    mypwm.setDuty(LastDuty);
+
+                    DEBUG_PRINTF("AutoDimTimer Stop  %d\r\n", xAutoDimTimer_Handler);
+                }
+                page = 1;
+            }
+            break;
+
+        case 5 /*Save  */:
+            if (page == 1)
+            {
+                page = 2;
+            }
+            else if (page == 2)
+            {
+                if (save_yes_no)
+                {
+                    DEBUG_PRINTF("go to page 3 %d\r\n", save_yes_no);
+                    timerStop(encoderTimer);
+                    if (mypwm.saveSettings() == PWM_ERR)
+
+                    {
+                        flash_text("Save Error!!", 2);
+                    }
+
+                    else
+                    {
+                        flash_text("Save completed!! System Reboot.", 2);
+                        ESP.restart();
+                    }
+                    page = 1;
+                    save_yes_no = false;
+                    timerRestart(encoderTimer);
+                }
+                else
+                {
+                    DEBUG_PRINTF("back  %d\r\n", save_yes_no);
+                    flash_text("Not save!!", 2);
+                    page = 1;
+                }
+            }
+
+            break;
+        case 6 /*  factor reset  */:
+            if (page == 1)
+            {
+                page = 2;
+            }
+            else if (page == 2)
+            {
+                if (save_yes_no)
+                {
+                    DEBUG_PRINTF("go to page 3 %d\r\n", save_yes_no);
+                    timerStop(encoderTimer);
+                    if (mypwm.resetSettings() == PWM_OK)
+                    {
+                        flash_text("Save completed!!", 2);
+                        flash_text("Reboot  system !!", 2);
+                        ESP.restart();
+                    }
+
+                    else
+                    {
+                        flash_text("Save Error!!", 1);
+                    }
+
+                    page = 1;
+                    save_yes_no = false;
+                    timerRestart(encoderTimer);
+                }
+                else
+                {
+                    DEBUG_PRINTF("back  %d\r\n", save_yes_no);
+                    flash_text("Not save!!", 2);
+                    page = 1;
+                }
+            }
+            break;
+        case 7 /*setup  */:
+
+            setup_mode = true;
+            Serial.println("Enter setup mode");
+            setup_frame = 1;
+            setup_page = 1;
+
+            break;
+        case 8 /*WIFI  */:
+            if (page == 1)
+            {
+                page = 2;
+            }
+            else if (page == 2)
+            {
+                page = 1;
+            }
+            break;
+        }
+    }
+}
 /**
  * *************************************************************************
  * @brief  software timer call back function for Screen sleep function 
@@ -1253,10 +1544,19 @@ void readRotaryEncoder()
  */
 void SleepTimerCallBackFun(TimerHandle_t xtimer)
 {
-
     ScreenIdleTime++; // count up ScreenIdleTime
 }
 
+/**
+ * *************************************************************************
+ * @brief  software timer call back function for Screen sleep function 
+ * *************************************************************************
+ */
+void AutoDimCallBackFun(TimerHandle_t xtimer)
+{
+    Serial.println("dim");
+    AutoDimFlag = true;
+}
 /**
  * *************************************************************************
  *  @brief ESP32 hardware timer interrupt call back function for Rotary encoder 
@@ -1265,8 +1565,14 @@ void SleepTimerCallBackFun(TimerHandle_t xtimer)
 
 void IRAM_ATTR rotaryISR()
 {
-    // Increment the counter and set the time of ISR
+
+    portENTER_CRITICAL_ISR(&mymux);
+
     encoder.service();
+    portEXIT_CRITICAL_ISR(&mymux);
+
+    // Increment the counter and set the time of ISR
+    //encoder.service();
     // Give a semaphore that we can check in the loop
 
     //xSemaphoreGiveFromISR(timerSemaphore, NULL);
@@ -1297,160 +1603,6 @@ void middle_button_process()
         case ClickEncoder::Held:
             middle_held = true;
             break;
-        }
-    }
-
-    if (middle_click) //middle_click Button is Pressed
-    {
-        middle_click = false; //middle_click Button is hold
-        if (setup_mode == false)
-        {
-            //main menu
-            switch (menuIndex)
-            {
-            case 0 /* PWM on off */:
-                // if (page == 1)
-                //{
-                mypwm.setPwmState(!mypwm.getPwmState());
-                if (!mypwm.getPwmState())
-                {
-                    mypwm.setDuty(0);
-                }
-                else
-                {
-                    mypwm.setDuty(mypwm.getDuty());
-                }
-                //}
-
-                break;
-
-            case 1 /* LED on off*/:
-
-                // if (page == 1)
-                // {
-
-                mypwm.setLedState(!mypwm.getLedState());
-                //  }
-
-                break;
-            case 2 /* Duty setup  */:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                    page = 1;
-                }
-
-                break;
-            case 3 /* Freq setup*/:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                    page = 1;
-                }
-                break;
-            case 4 /* Auto dim */:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                }
-                break;
-
-            case 5 /*Save  */:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                    if (save_yes_no)
-                    {
-                        DEBUG_PRINTF("go to page 3 %d\r\n", save_yes_no);
-                       
-                        flash_text("Save setting completed.", 2);
-                        page == 1;
-                    }
-                    else
-                    {
-                        DEBUG_PRINTF("back  %d\r\n", save_yes_no);
-                        flash_text("No save.", 2);
-                        page = 1;
-                    }
-                }
-
-                break;
-            case 6 /*  factor reset  */:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                    page = 1;
-                }
-                break;
-            case 7 /*setup  */:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                    setup_mode = true;
-                }
-                break;
-            case 8 /*WIFI  */:
-                if (page == 1)
-                {
-                    page = 2;
-                }
-                else if (page == 2)
-                {
-                    page = 1;
-                }
-                break;
-            }
-        }
-        else
-        { //setup menu
-            switch (setup_menu_index)
-            {
-            case 0: //back to main menu
-
-                DEBUG_PRINTF("go to main menu %d \r\n", setup_menu_index);
-                setup_mode = false;
-                setup_menu_index = 0;
-                page = 1;
-
-                break;
-            case 1:
-
-                /* code */
-                break;
-            case 2:
-                /* code */
-                break;
-            case 3:
-                /* code */
-                break;
-            case 4:
-                /* code */
-                break;
-            case 5:
-                /* code */
-                break;
-            case 6:
-                /* code */
-                break;
-            }
         }
     }
 }
