@@ -154,7 +154,7 @@ void Pwmgen::setDuty(float duty)
         DEBUG_PWM(" this_dutyRes:%i\r\n", this->_dutyRes);
         DEBUG_PWM(" this_dutyStep:%f\r\n", this->_dutyStep);
         //this->_get_timer_bit(this->_freq);
-        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map((this->_duty / MIN_DUTY_STEP), 0, (100 / MIN_DUTY_STEP) , 0, this->_dutyRes ) ,);
+        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map((this->_duty / MIN_DUTY_STEP), 0, (100 / MIN_DUTY_STEP), 0, this->_dutyRes),0);
 
         if (err != ESP_OK)
             DEBUG_PWM("SET freq duty fail!!\r\n");
@@ -163,6 +163,7 @@ void Pwmgen::setDuty(float duty)
     {
         err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
     }
+
 }
 
 void Pwmgen::setFreq(uint32_t freq)
@@ -226,12 +227,12 @@ void Pwmgen::setLedState(uint8_t ledState)
     Serial.println(gpio_get_level((gpio_num_t)this->_ledPin));
 }
 
-void Pwmgen::setOledSleepTime(int16_t oledSleepTime)
+void Pwmgen::setOledSleepTime(uint16_t oledSleepTime)
 {
     this->_oledSleepTime = oledSleepTime;
 }
 
-int16_t Pwmgen::getOledSleepTime(void)
+uint16_t Pwmgen::getOledSleepTime(void)
 {
     return this->_oledSleepTime;
 }

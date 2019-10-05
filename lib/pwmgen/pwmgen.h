@@ -62,7 +62,7 @@ private:
     uint8_t _ledState;
     uint8_t _pwmPin;
     uint8_t _ledPin;
-    int16_t _oledSleepTime;
+    uint16_t _oledSleepTime;
     uint16_t _ledOnDelay;
     uint16_t _pwmOnDelay;
     uint8_t _turnOnPriority;
@@ -109,9 +109,9 @@ public:
     void setPwmState(uint8_t pwmState);
     void setLedState(uint8_t ledState);
 
-    void setOledSleepTime(int16_t oledSleepTime);
+    void setOledSleepTime(uint16_t oledSleepTime);
 
-    int16_t getOledSleepTime(void);
+    uint16_t getOledSleepTime(void);
 
     Pwmgen(int pwmOutputPin, int ledOutputPin);
 

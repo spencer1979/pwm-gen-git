@@ -221,9 +221,11 @@ void vDisplayTask(void *arg)
     for (;;)
     {
 
-        CheckScreenSleep();
+        //Rotoary encoder and button
         readRotaryEncoder();
         middle_button_process();
+        //
+        CheckScreenSleep();
         if (setup_mode)
         {
             drawSetupMenu();
@@ -247,40 +249,69 @@ void CheckScreenSleep()
 {
     if (ScreenSleepEnable != (bool)mypwm.getOledSleepTime())
     {
-        DEBUG_PRINTF("Sleep timer State chaged  \r\n");
-        if ((bool)mypwm.getOledSleepTime())
+
+        ScreenSleepEnable = (bool)mypwm.getOledSleepTime();
+        if (ScreenSleepEnable)
         {
+            DEBUG_PRINTF("Sleep timer Enable \r\n");
             xSleepTimer_Handler = xTimerCreate("sleepTimer", pdMS_TO_TICKS(60000), pdTRUE, (void *)1, &SleepTimerCallBackFun);
+
             if (xTimerStart(xSleepTimer_Handler, 10) == pdTRUE)
             {
-                DEBUG_PRINTF("Sleep timer Start again. %d\r\n", xSleepTimer_Handler);
+                DEBUG_PRINTF("Sleep timer Start. %d\r\n", xSleepTimer_Handler);
+            }
+            else
+            {
+                DEBUG_PRINTF("Sleep timer Start fail. %d\r\n", xSleepTimer_Handler);
             }
         }
         else
         {
-            xTimerStop(xSleepTimer_Handler, 10);
-            DEBUG_PRINTF("Sleep timer Stop !! \r\n");
-            xTimerDelete(xSleepTimer_Handler, 10);
-            DEBUG_PRINTF("Sleep timer Deleted!! \r\n");
-
             DEBUG_PRINTF("Sleep timer Disable \r\n");
+
+            xTimerStop(xSleepTimer_Handler, 10);
+
+            xTimerDelete(xSleepTimer_Handler, 10);
+
             xSleepTimer_Handler = NULL;
         }
+
         ScreenIdleTime = 0;
-        ScreenSleepEnable = (bool)mypwm.getOledSleepTime();
     }
 
-    // OLED SCREEN Saving
     if (ScreenSleepEnable)
     {
+
+        if (up || down || middle_click) // check button and rotory encoder are clicked or move .
+        {
+            if (isScreenSleep)
+            {
+                up = false;
+                down = false;
+                middle_click = false;
+                xTimerStart(xSleepTimer_Handler, 10);
+                display.displayOn();
+                DEBUG_PRINTF("start Sleep Timer\r\n");
+            }
+            else
+            {
+                xTimerReset(xSleepTimer_Handler, 10);
+                DEBUG_PRINTF("Reset Sleep Timer\r\n");
+            }
+            isScreenSleep = false;
+            ScreenIdleTime = 0;
+        }
+
         if (ScreenIdleTime >= mypwm.getOledSleepTime())
         {
-            xTimerStop(xSleepTimer_Handler, 10);
+            DEBUG_PRINTF("Time out off oled \r\n");
             display.displayOff();
             isScreenSleep = true;
         }
+        DEBUG_PRINTF("Sleep Timer Time:%d \r\n", ScreenIdleTime);
     }
 }
+
 void drawDutyFreq()
 {
     char buffer[20];
@@ -868,6 +899,35 @@ void drawSetupMenu()
     }
     else if (setup_page = 2)
     {
+        char strTemp[50] = {0};
+        display.clear();
+        display.setFont(Serif_plain_8);
+        display.setColor(WHITE);
+        display.setTextAlignment(TEXT_ALIGN_CENTER);
+        display.drawHorizontalLine(0, 0, 128);
+        display.drawString(display.getWidth() / 2, 1, setup_menu_item[setup_menu_index]);
+        display.drawHorizontalLine(0, 12, 128);
+        display.setTextAlignment(TEXT_ALIGN_CENTER);
+        display.setFont(Serif_plain_8);
+
+        switch (setup_menu_index)
+        {
+        case 4 /* constant-expression */:
+            if (mypwm.getOledSleepTime() != 0)
+            {
+                sprintf(strTemp, "Sleep after %d minute(s)", mypwm.getOledSleepTime());
+            }
+            else
+            {
+                sprintf(strTemp, "Not sleeping", mypwm.getOledSleepTime());
+            }
+
+            display.drawString(display.getWidth() / 2, 16, strTemp);
+
+            break;
+        }
+
+        display.display();
     }
 }
 
@@ -885,25 +945,6 @@ void readRotaryEncoder()
     if (value / 2 > last)
     {
 
-        if (ScreenSleepEnable)
-
-        {
-            if (isScreenSleep)
-            {
-                xTimerStart(xSleepTimer_Handler, 10);
-                display.displayOn();
-                DEBUG_PRINTF("start Sleep Timer\r\n");
-                isScreenSleep = false;
-            }
-            else
-            {
-                xTimerReset(xSleepTimer_Handler, 2);
-                DEBUG_PRINTF("Reset Sleep Timer\r\n");
-                isScreenSleep = false;
-            }
-            ScreenIdleTime = 0;
-        }
-
         last = value / 2;
         up = true;
         Serial.printf("menuindex is %d\r\n", menuIndex);
@@ -911,24 +952,6 @@ void readRotaryEncoder()
     }
     else if (value / 2 < last)
     {
-        if (ScreenSleepEnable)
-
-        {
-            if (isScreenSleep)
-            {
-                xTimerStart(xSleepTimer_Handler, 2);
-                display.displayOn();
-                DEBUG_PRINTF("start Sleep Timer\r\n");
-                isScreenSleep = false;
-            }
-            else
-            {
-                xTimerReset(xSleepTimer_Handler, 2);
-                DEBUG_PRINTF("Reset Sleep Timer\r\n");
-                isScreenSleep = false;
-            }
-            ScreenIdleTime = 0;
-        }
 
         last = value / 2;
         down = true;
@@ -979,28 +1002,39 @@ void SetupMenu(void)
             setup_menu_index = 0;
         }
     }
-    else if (up && setup_page == 2 && setup_menu_index == 2) //increase Duty
+
+    else if (up && setup_page == 2 && setup_menu_index == 1) //   "PWM ON delay"
     {
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 3) //increase Freq
+    else if (up && setup_page == 2 && setup_menu_index == 2) // "LED On delay"
+    {
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 3) //"Turn-On Priority"
     {
 
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 4) // save setting
+    else if (up && setup_page == 2 && setup_menu_index == 4) // "OLED Sleep"
+    {
+
+        if (mypwm.getOledSleepTime() < 0xffff) //8 hr
+        {
+            mypwm.setOledSleepTime(mypwm.getOledSleepTime() + 1);
+        }
+
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 5) // "Duty Step"
     {
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 5) // Reset
+    else if (up && setup_page == 2 && setup_menu_index == 6) // "Freq Step "
     {
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 6) // Setup menu
-    {
-        up = false; //reset button
-    }
-    else if (up && setup_page == 2 && setup_menu_index == 7) // Setup menu
+    else if (up && setup_page == 2 && setup_menu_index == 7) //  "Auto dim time"
     {
         up = false; //reset button
     }
@@ -1044,27 +1078,38 @@ void SetupMenu(void)
         }
     }
 
-    else if (down && setup_page == 2 && setup_menu_index == 2) // descrease Duty
+    //Wifi ssid and password
+    else if (down && setup_page == 2 && setup_menu_index == 1) // PWM ON delay"
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 3) // descrease freq
+    else if (down && setup_page == 2 && setup_menu_index == 2) // "LED On delay"
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 4) // save default
+    else if (down && setup_page == 2 && setup_menu_index == 3) //Turn-On Priority"
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 5) //reset
+    else if (down && setup_page == 2 && setup_menu_index == 4) // "OLED Sleep"
+    {
+
+        if (mypwm.getOledSleepTime() != 0)
+        {
+            mypwm.setOledSleepTime(mypwm.getOledSleepTime() - 1);
+        }
+
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 5) //"Duty Step"
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 6) //Setup
+    else if (down && setup_page == 2 && setup_menu_index == 6) //"Freq Step
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 7) //Setup
+    else if (down && setup_page == 2 && setup_menu_index == 7) //"Auto dim time"
     {
         down = false; //reset button
     }
@@ -1081,8 +1126,8 @@ void SetupMenu(void)
 
             DEBUG_PRINTF("go to main menu %d \r\n", setup_menu_index);
             setup_mode = false;
-            setup_menu_index = 0;
-            menuIndex = 7;
+            //setup_menu_index = 0;
+            //menuIndex = 7;
             page = 1;
 
             break;
@@ -1097,12 +1142,70 @@ void SetupMenu(void)
             /* code */
             break;
         case 4:
-            /* code */
+
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
+
             break;
         case 5:
             /* code */
             break;
         case 6:
+            /* code */
+            break;
+        case 7:
+            /* code */
+            break;
+        }
+    }
+
+    if (middle_held)
+    {
+
+        middle_held = false;
+        switch (setup_menu_index)
+        {
+        case 0: //back to main menu
+
+            DEBUG_PRINTF("go to main menu %d \r\n", setup_menu_index);
+            setup_mode = false;
+            //setup_menu_index = 0;
+            //menuIndex = 7;
+            page = 1;
+
+            break;
+        case 1:
+
+            /* code */
+            break;
+        case 2:
+            /* code */
+            break;
+        case 3:
+            /* code */
+            break;
+        case 4:
+
+            if (setup_page == 2)
+            {
+                mypwm.setOledSleepTime(0);
+            }
+            
+
+            break;
+        case 5:
+            /* code */
+            break;
+        case 6:
+            /* code */
+            break;
+        case 7:
             /* code */
             break;
         }
@@ -1311,11 +1414,11 @@ void MainMenu(void)
         snprintf(temp, sizeof(temp), "Duty Cycle :%.1f%%", mypwm.getDuty());
         display.clear();
         display.setColor(WHITE);
-        display.drawProgressBar(0, 0, display.getWidth()-1, display.getHeight()-13, mypwm.getDuty());
+        display.drawProgressBar(0, 0, display.getWidth() - 1, display.getHeight() - 13, mypwm.getDuty());
         display.setTextAlignment(TEXT_ALIGN_CENTER);
 
         display.setFont(Serif_plain_8);
-        display.drawString(63 , 20 , temp);
+        display.drawString(63, 20, temp);
         display.display();
         // start timer
     }
