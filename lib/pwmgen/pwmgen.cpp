@@ -173,6 +173,7 @@ void Pwmgen::setDuty(float duty)
     {
         err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
     }
+
 }
 
 void Pwmgen::setFreq(uint32_t freq)
