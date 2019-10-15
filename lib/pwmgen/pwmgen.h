@@ -28,6 +28,9 @@
 #define MIN_ADJUST_FREQ (1000)   //min adjust freq 1Khz
 #define MIN_FREQ_STEP (100)      //min  freq step 0.1Khz
 #define MIN_DUTY_STEP (0.5)
+#define LED_MAX_ON_DELAY  (10000)
+#define PWM_MAX_ON_DELAY  (10000)
+#define ON_DELAY_STEP (10)
 
 #define DEBUG_PWM(...) Serial.printf(__VA_ARGS__)
 
@@ -63,10 +66,10 @@ private:
     uint8_t _pwmPin;
     uint8_t _ledPin;
     int16_t _oledSleepTime;
-    uint16_t _ledOnDelay;
-    uint16_t _pwmOnDelay;
-    uint8_t _turnOnPriority;
-    uint16_t _autoDimDuration;
+    int16_t _ledOnDelay;
+    int16_t _pwmOnDelay;
+    int8_t _turnOnPriority;
+    int16_t _autoDimDuration;
 
     // _timerBit
     ledc_channel_config_t _pwm_channel;
@@ -78,43 +81,39 @@ private:
     pwm_err _createDefaultSettings(const char *file); // create def.json and user.json file
 
 public:
-    // uint8_t settingConfig( PWM_config_t config);
-
+    //JSON configuration function
     pwm_err resetSettings(void);            // load def.json to user.json
     pwm_err saveSettings(void);             //save setting to user.json
     pwm_err loadSettings(const char *file); //load "user,json" to system
-
-    bool begin(); // load config
-    float getDuty(void);
-    uint32_t getFreq(void);
-    float getDutyStep(void);
-    uint32_t getFreqStep(void);
-    uint8_t getPwmState(void);
-    uint8_t getLedState(void);
-    uint16_t getLedOnDealy();
-    uint16_t getPwmOnDealy();
-
+    bool begin();                           // load config
+    // on delay function
+    int16_t getLedOnDealy();
+    int16_t getPwmOnDealy();
+    void setLedOnDealy(int16_t onDelay);
+    void setPwmOnDealy(int16_t onDelay);
+    // On Priority
     PWM_on_sequence_t getOnPriority(void);
-
-    void setOnPriority(uint8_t type);
+    void setOnPriority(int8_t type);
+    // duty function
     void setDuty(float duty);
     void setDutyStep(float dutyStep);
-
+    float getDuty(void);
+    float getDutyStep(void);
+    //freq function
     void setFreq(uint32_t freq);
     void setFreqStep(uint32_t freqStep);
-
-    void setLedOnDealy(uint16_t onDelay);
-    void setPwmOnDealy(uint16_t onDelay);
-
+    uint32_t getFreq(void);
+    uint32_t getFreqStep(void);
+    // pwm led on/off state
     void setPwmState(uint8_t pwmState);
     void setLedState(uint8_t ledState);
-
+    uint8_t getPwmState(void);
+    uint8_t getLedState(void);
+    //oled sleep time
     void setOledSleepTime(int16_t oledSleepTime);
-
     int16_t getOledSleepTime(void);
-
+    // constructor
     Pwmgen(int pwmOutputPin, int ledOutputPin);
-
     Pwmgen();
 
     virtual ~Pwmgen();

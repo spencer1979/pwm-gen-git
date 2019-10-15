@@ -868,6 +868,59 @@ void drawSetupMenu()
     }
     else if (setup_page = 2)
     {
+
+        char strTemp[50] = {0};
+        display.clear();
+        display.setFont(Serif_plain_8);
+        display.setColor(WHITE);
+        display.setTextAlignment(TEXT_ALIGN_CENTER);
+        display.drawHorizontalLine(0, 0, 128);
+        display.drawString(display.getWidth() / 2, 1, setup_menu_item[setup_menu_index]);
+        display.drawHorizontalLine(0, 12, 128);
+        display.setTextAlignment(TEXT_ALIGN_CENTER);
+        display.setFont(Serif_plain_18);
+        switch (setup_menu_index)
+        {
+        case 0 /*back to main */:
+            break;
+        case 1 /*PWM on delay  */:
+
+            if (mypwm.getPwmOnDealy() == 0)
+            {
+                sprintf(strTemp, "NO delay");
+            }
+            else
+            {
+                sprintf(strTemp, "%d ms", mypwm.getPwmOnDealy());
+            }
+
+            break;
+        case 2 /*LED on delay  */:
+            if (mypwm.getLedOnDealy() == 0)
+            {
+                sprintf(strTemp, "NO delay");
+            }
+            else
+            {
+                sprintf(strTemp, "%d ms", mypwm.getLedOnDealy());
+            }
+
+            break;
+        case 3 /*Turn-On Priority*/:
+
+            break;
+        case 4 /* "OLED Sleep" */:
+
+            break;
+        case 5 /*"Duty Step" */:
+
+        case 6 /* "Freq Step "*/:
+
+        case 7 /* "Auto dim time" */:
+            break;
+        }
+        display.drawString((display.getWidth() / 2), 13, strTemp);
+        display.display();
     }
 }
 
@@ -979,28 +1032,36 @@ void SetupMenu(void)
             setup_menu_index = 0;
         }
     }
-    else if (up && setup_page == 2 && setup_menu_index == 2) //increase Duty
+
+    else if (up && setup_page == 2 && setup_menu_index == 1) //PWM ON delay
     {
+        mypwm.setPwmOnDealy(mypwm.getPwmOnDealy() + ON_DELAY_STEP);
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 3) //increase Freq
+    else if (up && setup_page == 2 && setup_menu_index == 2) //"LED On delay"
     {
+        mypwm.setLedOnDealy(mypwm.getLedOnDealy() + ON_DELAY_STEP);
 
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 4) // save setting
+    else if (up && setup_page == 2 && setup_menu_index == 3) //Turn-On Priority
+    {
+        mypwm.setOnPriority(mypwm.getOnPriority() + 1);
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 4) // OLED Sleep
     {
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 5) // Reset
+    else if (up && setup_page == 2 && setup_menu_index == 5) // "Duty Step"
     {
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 6) // Setup menu
+    else if (up && setup_page == 2 && setup_menu_index == 6) // "Freq Step "
     {
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 7) // Setup menu
+    else if (up && setup_page == 2 && setup_menu_index == 7) // "Auto dim time"
     {
         up = false; //reset button
     }
@@ -1044,27 +1105,38 @@ void SetupMenu(void)
         }
     }
 
-    else if (down && setup_page == 2 && setup_menu_index == 2) // descrease Duty
+    else if (down && setup_page == 2 && setup_menu_index == 1) //PWM ON delay
+    {
+        mypwm.setPwmOnDealy(mypwm.getPwmOnDealy() - ON_DELAY_STEP);
+
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 2) //"LED On delay"
+    {
+        mypwm.setLedOnDealy(mypwm.getLedOnDealy() - ON_DELAY_STEP);
+
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 3) //Turn-On Priority
+
+    {
+        mypwm.setOnPriority(mypwm.getOnPriority() - 1);
+
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 4) // OLED Sleep
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 3) // descrease freq
+    else if (down && setup_page == 2 && setup_menu_index == 5) // "Duty Step"
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 4) // save default
+    else if (down && setup_page == 2 && setup_menu_index == 6) // "Freq Step "
     {
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 5) //reset
-    {
-        down = false; //reset button
-    }
-    else if (down && setup_page == 2 && setup_menu_index == 6) //Setup
-    {
-        down = false; //reset button
-    }
-    else if (down && setup_page == 2 && setup_menu_index == 7) //Setup
+    else if (down && setup_page == 2 && setup_menu_index == 7) // "Auto dim time"
     {
         down = false; //reset button
     }
@@ -1087,24 +1159,88 @@ void SetupMenu(void)
 
             break;
         case 1:
+            if (setup_page == 1)
+            {
+
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
 
             /* code */
             break;
         case 2:
             /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
+
             break;
         case 3:
             /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
             break;
         case 4:
             /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
             break;
         case 5:
             /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
             break;
         case 6:
             /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
             break;
+        }
+    }
+    //button hold to reset some thing 
+    if (middle_held)
+    {
+        middle_held = false;
+        if (setup_page == 2 && setup_menu_index == 1)
+        {
+
+            mypwm.setPwmOnDealy(0);
+        }
+        else if (setup_page == 2 && setup_menu_index == 1)
+        {
+            mypwm.setLedOnDealy(0);
         }
     }
 }
@@ -1311,11 +1447,11 @@ void MainMenu(void)
         snprintf(temp, sizeof(temp), "Duty Cycle :%.1f%%", mypwm.getDuty());
         display.clear();
         display.setColor(WHITE);
-        display.drawProgressBar(0, 0, display.getWidth()-1, display.getHeight()-13, mypwm.getDuty());
+        display.drawProgressBar(0, 0, display.getWidth() - 1, display.getHeight() - 13, mypwm.getDuty());
         display.setTextAlignment(TEXT_ALIGN_CENTER);
 
         display.setFont(Serif_plain_8);
-        display.drawString(63 , 20 , temp);
+        display.drawString(63, 20, temp);
         display.display();
         // start timer
     }

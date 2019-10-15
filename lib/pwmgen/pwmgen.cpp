@@ -137,8 +137,18 @@ PWM_on_sequence_t Pwmgen::getOnPriority(void)
 {
     return (PWM_on_sequence_t)this->_turnOnPriority;
 }
-void Pwmgen::setOnPriority(uint8_t type)
+void Pwmgen::setOnPriority(int8_t type)
 {
+    if (type > PWM_ON_THEN_LED_ON)
+    {
+        type = PWM_ON_THEN_LED_ON;
+    }
+
+    if (type < 0)
+    {
+        type = INDEPENDENT;
+    }
+
     this->_turnOnPriority = type;
 }
 
@@ -154,7 +164,7 @@ void Pwmgen::setDuty(float duty)
         DEBUG_PWM(" this_dutyRes:%i\r\n", this->_dutyRes);
         DEBUG_PWM(" this_dutyStep:%f\r\n", this->_dutyStep);
         //this->_get_timer_bit(this->_freq);
-        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map((this->_duty / MIN_DUTY_STEP), 0, (100 / MIN_DUTY_STEP) , 0, this->_dutyRes ) ,);
+        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map((this->_duty / MIN_DUTY_STEP), 0, (100 / MIN_DUTY_STEP), 0, this->_dutyRes), 0);
 
         if (err != ESP_OK)
             DEBUG_PWM("SET freq duty fail!!\r\n");
@@ -236,21 +246,38 @@ int16_t Pwmgen::getOledSleepTime(void)
     return this->_oledSleepTime;
 }
 
-uint16_t Pwmgen::getLedOnDealy()
+int16_t Pwmgen::getLedOnDealy()
 {
     return this->_ledOnDelay;
 }
-uint16_t Pwmgen::getPwmOnDealy()
+int16_t Pwmgen::getPwmOnDealy()
 {
     return this->_pwmOnDelay;
 }
 
-void Pwmgen::setLedOnDealy(uint16_t onDelay)
+void Pwmgen::setLedOnDealy(int16_t onDelay)
 {
+    if (onDelay >= LED_MAX_ON_DELAY)
+    {
+        onDelay = LED_MAX_ON_DELAY;
+    }
+    if (onDelay <= 0)
+    {
+        onDelay = 0;
+    }
+
     this->_ledOnDelay = onDelay;
 }
-void Pwmgen::setPwmOnDealy(uint16_t onDelay)
+void Pwmgen::setPwmOnDealy(int16_t onDelay)
 {
+    if (onDelay >= PWM_MAX_ON_DELAY)
+    {
+        onDelay = PWM_MAX_ON_DELAY;
+    }
+    if (onDelay <= 0)
+    {
+        onDelay = 0;
+    }
     this->_pwmOnDelay = onDelay;
 }
 
