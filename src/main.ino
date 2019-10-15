@@ -1231,74 +1231,13 @@ void SetupMenu(void)
         }
     }
 
-    if (middle_held)
-    {
-
-        middle_held = false;
-        switch (setup_menu_index)
-        {
-        case 0: //back to main menu
-
-            DEBUG_PRINTF("go to main menu %d \r\n", setup_menu_index);
-            setup_mode = false;
-            //setup_menu_index = 0;
-            //menuIndex = 7;
-            page = 1;
-
-            break;
-        case 1:
-
-            /* code */
-            break;
-        case 2:
-            /* code */
-            break;
-        case 3:
-            /* code */
-            break;
-        case 4:
-
-            if (setup_page == 2)
-            {
-                mypwm.setOledSleepTime(0);
-            }
-            
-
-            break;
-        case 5:
-            /* code */
-            if (setup_page == 1)
-            {
-                setup_page = 2;
-            }
-            else if (setup_page == 2)
-            {
-                setup_page = 1;
-            }
-            break;
-        case 6:
-            /* code */
-            if (setup_page == 1)
-            {
-                setup_page = 2;
-            }
-            else if (setup_page == 2)
-            {
-                setup_page = 1;
-            }
-            break;
-        case 7:
-            /* code */
-            break;
-        }
-    }
+   
     //button hold to reset some thing 
     if (middle_held)
     {
         middle_held = false;
         if (setup_page == 2 && setup_menu_index == 1)
         {
-
             mypwm.setPwmOnDealy(0);
         }
         else if (setup_page == 2 && setup_menu_index == 1)
