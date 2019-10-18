@@ -161,6 +161,9 @@ void setup()
         //     // while (1)
         //     //     ;
     }
+
+    server.begin();
+    
 }
 
 void loop()
