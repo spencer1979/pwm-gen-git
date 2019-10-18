@@ -27,16 +27,19 @@
 #define MAX_ADJUST_FREQ (100000) //max adjust freq 100Khz
 #define MIN_ADJUST_FREQ (1000)   //min adjust freq 1Khz
 #define MIN_FREQ_STEP (100)      //min  freq step 0.1Khz
-#define MIN_DUTY_STEP (0.5)
-#define LED_MAX_ON_DELAY  (10000)
-#define PWM_MAX_ON_DELAY  (10000)
+#define MAX_FREQ_STEP (10000)    //max  freq step size 2Khz
+#define MIN_DUTY_STEP (0.1f)     //min  duty step size 0.1%
+#define MAX_DUTY_STEP (25.0f)    //max  duty step size 25% duty
+
+#define MIN_AUTO_DIM_STEP_TIME (10)    //min  Dimming time step size 10mS
+#define MAX_AUTO_DIM_STEP_TIME (10000) //max   Dimming time step size 10S
+
+#define LED_MAX_ON_DELAY (10000)
+#define PWM_MAX_ON_DELAY (10000)
 #define ON_DELAY_STEP (10)
+#define MAX_SLEEP_TIME (480) //120 minutes
 
-#define DEBUG_PWM(...) Serial.printf(__VA_ARGS__)
 
-#ifndef DEBUG_PWM
-#define DEBUG_PWM(...)
-#endif
 typedef enum
 {
     PWM_OK = 0,
@@ -69,12 +72,12 @@ private:
     int16_t _ledOnDelay;
     int16_t _pwmOnDelay;
     int8_t _turnOnPriority;
-    int16_t _autoDimDuration;
+    uint16_t _autoDimStepTime;
 
     // _timerBit
     ledc_channel_config_t _pwm_channel;
     ledc_timer_config_t _pwm_timer;
-    ledc_timer_bit_t _get_timer_bit(uint32_t freq);
+
     //Resolution of PWM duty (0-  2**timer_bit_ -1 )
     uint16_t _dutyRes;
 
@@ -112,6 +115,10 @@ public:
     //oled sleep time
     void setOledSleepTime(int16_t oledSleepTime);
     int16_t getOledSleepTime(void);
+    //auto dim
+    int16_t getAutoDimStepTime(void);
+    void setAutoDimStepTime(int16_t dimTime);
+
     // constructor
     Pwmgen(int pwmOutputPin, int ledOutputPin);
     Pwmgen();
