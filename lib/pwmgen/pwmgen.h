@@ -33,12 +33,16 @@
 
 #define MIN_AUTO_DIM_STEP_TIME (10)    //min  Dimming time step size 10mS
 #define MAX_AUTO_DIM_STEP_TIME (10000) //max   Dimming time step size 10S
-
+// limit min & max turn on time  
 #define LED_MAX_ON_DELAY (10000)
 #define PWM_MAX_ON_DELAY (10000)
 #define ON_DELAY_STEP (10)
-#define MAX_SLEEP_TIME (480) //120 minutes
+// limit min & max turn off time  
+#define LED_MAX_OFF_DELAY (10000)
+#define PWM_MAX_OFF_DELAY (10000)
+#define OFF_DELAY_STEP (10)
 
+#define MAX_SLEEP_TIME (480) //120 minutes
 
 typedef enum
 {
@@ -49,12 +53,19 @@ typedef enum
 
 typedef enum
 {
-    INDEPENDENT = 0,
+    INDEPENDENT_ON = 0,
     LED_ON_THEN_PWM_ON,
     PWM_ON_THEN_LED_ON
 
 } PWM_on_sequence_t;
 
+typedef enum
+{
+    INDEPENDENT_OFF = 0,
+    LED_OFF_THEN_PWM_OFF,
+    PWM_OFF_THEN_LED_OFF
+
+} PWM_off_sequence_t;
 class Pwmgen
 {
 private:
@@ -72,6 +83,9 @@ private:
     int16_t _ledOnDelay;
     int16_t _pwmOnDelay;
     int8_t _turnOnPriority;
+    int16_t _ledOffDelay;
+    int16_t _pwmOffDelay;
+    int8_t _turnOffPriority;
     uint16_t _autoDimStepTime;
 
     // _timerBit
@@ -90,15 +104,24 @@ public:
     pwm_err loadSettings(const char *file); //load "user,json" to system
     bool begin();                           // load config
     // on delay function
-    int16_t getLedOnDealy();
-    int16_t getPwmOnDealy();
-    void setLedOnDealy(int16_t onDelay);
-    void setPwmOnDealy(int16_t onDelay);
+    int16_t getLedOnDelay();
+    int16_t getPwmOnDelay();
+    void setLedOnDelay(int16_t onDelay);
+    void setPwmOnDelay(int16_t onDelay);
     // On Priority
     PWM_on_sequence_t getOnPriority(void);
     void setOnPriority(int8_t type);
+    //off delay function
+      int16_t getLedOffDelay();
+    int16_t getPwmOffDelay();
+    void setLedOffDelay(int16_t offDelay);
+    void setPwmOffDelay(int16_t offDelay);
+    //off priority
+    PWM_off_sequence_t getOffPriority(void);
+    void setOffPriority(int8_t type);
+
     // duty function
-    void setDuty(float duty);
+    int setDuty(float duty);
     void setDutyStep(float dutyStep);
     float getDuty(void);
     float getDutyStep(void);

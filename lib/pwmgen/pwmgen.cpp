@@ -151,7 +151,7 @@ void Pwmgen::setAutoDimStepTime(int16_t dimTime)
 /**
  * @brief Get the pwm led on priority 
  * 
- * 0-->INDEPENDENT  
+ * 0-->INDEPENDENT_ON  
  * 1-->led on then pwm on 
  * 2-->pwm on then led on 
  * 
@@ -170,33 +170,63 @@ void Pwmgen::setOnPriority(int8_t type)
 
     if (type < 0)
     {
-        type = INDEPENDENT;
+        type = INDEPENDENT_ON;
     }
 
     this->_turnOnPriority = type;
 }
 
-void Pwmgen::setDuty(float duty)
+/**
+ * @brief Get the pwm led off priority 
+ * 
+ * 0-->INDEPENDENT_Off  
+ * 1-->led off then pwm off 
+ * 2-->pwm off then led off 
+ * 
+ * @return PWM_off_sequence_t  
+ */
+PWM_off_sequence_t Pwmgen::getOffPriority(void)
+{
+    return (PWM_off_sequence_t)this->_turnOffPriority;
+}
+
+void Pwmgen::setOffPriority(int8_t type)
+{
+    if (type > PWM_OFF_THEN_LED_OFF)
+    {
+        type = PWM_OFF_THEN_LED_OFF;
+    }
+
+    if (type < 0)
+    {
+        type = INDEPENDENT_OFF;
+    }
+
+    this->_turnOffPriority = type;
+}
+
+int Pwmgen::setDuty(float duty)
 {
     esp_err_t err;
     this->_duty = duty;
-    if (this->_pwmState == 1)
+    // if (this->_pwmState == 1)
+    //{
+    if (duty != 0)
     {
-        if (duty != 0)
-        {
 
-            err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map((this->_duty / MIN_DUTY_STEP), 0, (100 / MIN_DUTY_STEP), 0, this->_dutyRes), 0);
-
-            if (err != ESP_OK)
-                DEBUG_PRINTF("Set pwm signal fail!!\r\n");
-            else
-                DEBUG_PRINTF("Set pwm signal Completed!!\r\n");
-        }
-        else
-        {
-            err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
-        }
+        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, map((this->_duty / MIN_DUTY_STEP), 0, (100 / MIN_DUTY_STEP), 0, this->_dutyRes), 0);
     }
+    else
+    {
+        err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
+    }
+    // }
+    // else
+    //{
+    //    err = ESP_FAIL;
+    //}
+
+    return (int)err;
 }
 
 void Pwmgen::setFreq(uint32_t freq)
@@ -239,34 +269,60 @@ void Pwmgen::setFreqStep(uint32_t freqStep)
 void Pwmgen::setPwmState(uint8_t pwmState)
 {
     esp_err_t err;
-    if (pwmState == 1)
+
+    if (pwmState == 1) // turn on , check delay  on
     {
-        this->_pwmState = 1;
-        setDuty(getDuty());
+        err = setDuty(getDuty());
+        if (err == ESP_OK)
+        {
+            this->_pwmState = 1;
+        }
+
+        // if (setDuty(getDuty()) != ESP_OK)
+        // {
+        //     this->_pwmState = 0;
+        // }
+        // else
+        // {
+        //     this->_pwmState = 1;
+        // }
     }
-    if (pwmState == 0)
+
+    else if (pwmState == 0) // turn off , check delay off
     {
-        this->_pwmState = 0;
+
         err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
+        if (err == ESP_OK)
+        {
+            this->_pwmState = 0;
+        }
     }
 }
 
 void Pwmgen::setLedState(uint8_t ledState)
 {
     int level;
-    this->_ledState = ledState;
-
     /*check pin level*/
     level = gpio_get_level((gpio_num_t)this->_ledPin);
-    DEBUG_PRINTF("1 GPIO PWM State is %d \r\n", level);
+
     if ((uint8_t)level != ledState)
     {
         Serial.println("Set pin ");
+        if (ledState == 1)
+        {
 
-        gpio_set_level((gpio_num_t)this->_ledPin, this->_ledState);
+            gpio_set_level((gpio_num_t)this->_ledPin, 1);
+
+            this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+        }
+        else if (ledState == 0)
+        {
+
+            gpio_set_level((gpio_num_t)this->_ledPin, 0);
+
+            this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+        }
     }
-    Serial.println("Read pin state:");
-    Serial.println(gpio_get_level((gpio_num_t)this->_ledPin));
 }
 
 void Pwmgen::setOledSleepTime(int16_t oledSleepTime)
@@ -285,16 +341,24 @@ int16_t Pwmgen::getOledSleepTime(void)
     return this->_oledSleepTime;
 }
 
-int16_t Pwmgen::getLedOnDealy()
+int16_t Pwmgen::getLedOnDelay()
 {
     return this->_ledOnDelay;
 }
-int16_t Pwmgen::getPwmOnDealy()
+int16_t Pwmgen::getPwmOnDelay()
 {
     return this->_pwmOnDelay;
 }
 
-void Pwmgen::setLedOnDealy(int16_t onDelay)
+int16_t Pwmgen::getPwmOffDelay()
+{
+    return this->_pwmOffDelay;
+}
+int16_t Pwmgen::getLedOffDelay()
+{
+    return this->_ledOffDelay;
+}
+void Pwmgen::setLedOnDelay(int16_t onDelay)
 {
     if (onDelay >= LED_MAX_ON_DELAY)
 
@@ -306,7 +370,7 @@ void Pwmgen::setLedOnDealy(int16_t onDelay)
 
     this->_ledOnDelay = onDelay;
 }
-void Pwmgen::setPwmOnDealy(int16_t onDelay)
+void Pwmgen::setPwmOnDelay(int16_t onDelay)
 {
     if (onDelay >= PWM_MAX_ON_DELAY)
 
@@ -319,9 +383,34 @@ void Pwmgen::setPwmOnDealy(int16_t onDelay)
     this->_pwmOnDelay = onDelay;
 }
 
+void Pwmgen::setLedOffDelay(int16_t offDelay)
+{
+    if (offDelay >= LED_MAX_OFF_DELAY)
+
+        offDelay = LED_MAX_OFF_DELAY;
+
+    if (offDelay <= 0)
+
+        offDelay = 0;
+
+    this->_ledOffDelay = offDelay;
+}
+void Pwmgen::setPwmOffDelay(int16_t offDelay)
+{
+    if (offDelay >= PWM_MAX_OFF_DELAY)
+
+        offDelay = PWM_MAX_OFF_DELAY;
+
+    if (offDelay <= 0)
+
+        offDelay = 0;
+
+    this->_pwmOffDelay = offDelay;
+}
+
 pwm_err Pwmgen::saveSettings(void)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(11) + 140;
+    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
     //DynamicJsonDocument doc(capacity);
     StaticJsonDocument<capacity> doc;
     DeserializationError err;
@@ -333,12 +422,15 @@ pwm_err Pwmgen::saveSettings(void)
     doc["DUTY"] = this->_duty; // 50% duty
     //doc["LED_STATE"] = this->_ledState;            //  normal off
     //doc["PWM_STATE"] = this->_pwmState;            //  normal off
-    doc["FREQ_STEP"] = this->_freqStep;                 // min frequency step value 100 means 0.1kHZ
-    doc["DUTY_STEP"] = this->_dutyStep;                 // min  frequency step value 0.5 means 0.5% duty
-    doc["OLED_SLEEP_TIME"] = this->_oledSleepTime;      //oled screen off saving time 1 minute
-    doc["LED_ON_DELAY"] = this->_ledOnDelay;            // LED turn on delay 0mS
-    doc["PWM_ON_DELAY"] = this->_pwmOnDelay;            // PWM signal turn on delay 0mS
-    doc["TURN_ON_PRI"] = this->_turnOnPriority;         //  LED and PWM signal turn on sequence
+    doc["FREQ_STEP"] = this->_freqStep;            // min frequency step value 100 means 0.1kHZ
+    doc["DUTY_STEP"] = this->_dutyStep;            // min  frequency step value 0.5 means 0.5% duty
+    doc["OLED_SLEEP_TIME"] = this->_oledSleepTime; //oled screen off saving time 1 minute
+    doc["LED_ON_DELAY"] = this->_ledOnDelay;       // LED turn on delay 0mS
+    doc["PWM_ON_DELAY"] = this->_pwmOnDelay;       // PWM signal turn on delay 0mS
+    doc["LED_OFF_DELAY"] = this->_ledOffDelay;     // LED turn on delay 0mS
+    doc["PWM_OFF_DELAY"] = this->_pwmOffDelay;     // PWM signal turn on delay 0mS
+    doc["TURN_ON_PRI"] = this->_turnOnPriority;    //  LED and PWM signal turn on sequence
+    doc["TURN_OFF_PRI"] = this->_turnOffPriority;
     doc["AUTO_DIM_STEP_TIME"] = this->_autoDimStepTime; //auto dimming time 500 mSecond .
 
     DEBUG_PRINTF("Create JSON contents below :\r\n  ");
@@ -377,7 +469,7 @@ pwm_err Pwmgen::saveSettings(void)
 
 pwm_err Pwmgen::resetSettings(void)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(11) + 140;
+    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
     //DynamicJsonDocument doc(capacity);
     StaticJsonDocument<capacity> doc;
     DeserializationError err;
@@ -401,7 +493,7 @@ pwm_err Pwmgen::resetSettings(void)
 
     if (err)
     {
-        Serial.printf("deserialize Json fail %d ", err.code());
+        DEBUG_PRINTF("deserialize Json fail %d ", err.code());
         return PWM_ERR;
     }
     this->_freq = doc["FREQ"];                          // 10000
@@ -414,12 +506,15 @@ pwm_err Pwmgen::resetSettings(void)
     this->_ledOnDelay = doc["LED_ON_DELAY"];            // 0
     this->_pwmOnDelay = doc["PWM_ON_DELAY"];            // 0
     this->_turnOnPriority = doc["TURN_ON_PRI"];         // 0
+    this->_ledOffDelay = doc["LED_OFF_DELAY"];          // 0
+    this->_pwmOffDelay = doc["PWM_OFF_DELAY"];          // 0
+    this->_turnOffPriority = doc["TURN_OFF_PRI"];       // 0
     this->_autoDimStepTime = doc["AUTO_DIM_STEP_TIME"]; // 500
 
     fileWrite = serializeJson(doc, f2);
     if (!fileWrite)
     {
-        Serial.printf("Serialize Json fail %s ", f2.name());
+        DEBUG_PRINTF("Serialize Json fail %s ", f2.name());
         return PWM_ERR;
     }
 
@@ -438,7 +533,7 @@ pwm_err Pwmgen::resetSettings(void)
  */
 pwm_err Pwmgen::_createDefaultSettings(const char *file)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(11) + 140;
+    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
     //DynamicJsonDocument doc(capacity);
     StaticJsonDocument<capacity> doc;
 
@@ -455,7 +550,10 @@ pwm_err Pwmgen::_createDefaultSettings(const char *file)
     doc["OLED_SLEEP_TIME"] = 1;                         //oled screen off saving time 1 minute
     doc["LED_ON_DELAY"] = 0;                            // LED turn on delay 0mS
     doc["PWM_ON_DELAY"] = 0;                            // PWM signal turn on delay 0mS
-    doc["TURN_ON_PRI"] = (uint8_t)INDEPENDENT;          //  LED and PWM signal turn on sequence
+    doc["TURN_ON_PRI"] = (uint8_t)INDEPENDENT_ON;       //  LED and PWM signal turn on sequence
+    doc["LED_OFF_DELAY"] = 0;                           // LED turn on delay 0mS
+    doc["PWM_OFF_DELAY"] = 0;                           // PWM signal turn on delay 0mS
+    doc["TURN_OFF_PRI"] = (uint8_t)INDEPENDENT_OFF;     //  LED and PWM signal turn on sequence
     doc["AUTO_DIM_STEP_TIME"] = MIN_AUTO_DIM_STEP_TIME; //auto dimming time 500 mSecond .
 
     DEBUG_PRINTF("Create JSON contents below :\r\n  ");
@@ -491,7 +589,7 @@ pwm_err Pwmgen::_createDefaultSettings(const char *file)
  */
 pwm_err Pwmgen::loadSettings(const char *file)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(11) + 140;
+    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
     //DynamicJsonDocument doc(capacity); // documents smaller than 1KB
     StaticJsonDocument<capacity> doc; // documents larger than 1KB
     DeserializationError err;
@@ -527,19 +625,22 @@ pwm_err Pwmgen::loadSettings(const char *file)
         loadSettings(USER_JSON_FILE_PATH);
     }
 
-    this->_freq = (uint32_t)doc["FREQ"];                    // 10000
-    this->_duty = (float)doc["DUTY"];                       // 50
-    this->_freqStep = (uint32_t)doc["FREQ_STEP"];           // 100
-    this->_dutyStep = (float)doc["DUTY_STEP"];              // 0.5
-    this->_oledSleepTime = (int16_t)doc["OLED_SLEEP_TIME"]; // 1
-    this->_ledOnDelay = (int16_t)doc["LED_ON_DELAY"];       // 0
-    this->_pwmOnDelay = (int16_t)doc["PWM_ON_DELAY"];       // 0
-    this->_turnOnPriority = (int8_t)doc["TURN_ON_PRI"];     // 0
-
+    this->_freq = (uint32_t)doc["FREQ"];                          // 10000
+    this->_duty = (float)doc["DUTY"];                             // 50
+    this->_freqStep = (uint32_t)doc["FREQ_STEP"];                 // 100
+    this->_dutyStep = (float)doc["DUTY_STEP"];                    // 0.5
+    this->_oledSleepTime = (int16_t)doc["OLED_SLEEP_TIME"];       // 1
+    this->_ledOnDelay = (int16_t)doc["LED_ON_DELAY"];             // 0
+    this->_pwmOnDelay = (int16_t)doc["PWM_ON_DELAY"];             // 0
+    this->_turnOnPriority = (int8_t)doc["TURN_ON_PRI"];           // 0
+    this->_ledOffDelay = (int16_t)doc["LED_OFF_DELAY"];           // 0
+    this->_pwmOffDelay = (int16_t)doc["PWM_OFF_DELAY"];           // 0
+    this->_turnOffPriority = (int8_t)doc["TURN_OFF_PRI"];         // 0
     this->_autoDimStepTime = (uint16_t)doc["AUTO_DIM_STEP_TIME"]; // 500
 
     DEBUG_PRINTF("Serialization data:%d \r\n", err.code());
     serializeJsonPretty(doc, Serial);
+    DEBUG_PRINTF("this->_autoDimStepTime:%d \r\n", this->_autoDimStepTime);
     DEBUG_PRINTF("\r\n");
     f.close();
     doc.clear();

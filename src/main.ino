@@ -30,7 +30,7 @@
 #include <ESPAsyncWebServer.h>
 #include <config.h>
 // version
-#define PROGRAM_VERSION "2019-10-18"
+#define PROGRAM_VERSION "2019-11-06"
 //PWM gpio//PWM Duty and freq Setting (output)
 #define PWM_TIMER LEDC_TIMER_0
 #define PWM_TEST_FADE_TIME (60000)
@@ -81,8 +81,9 @@ bool AutoDimFlag = false;
 bool DutyDirection = true;
 // menu Text
 String main_menu_item[9] = {"PWM:", "LED:", "Duty setup", "Freq setup", "Auto dim", "Save", "Reset", "Sys Setup", "Wifi IP"};
-String setup_menu_item[8] = {"Back to main", "PWM on delay", "LED on delay", "Turn-On Timing", "OLED sleep", "Duty step size", "Freq step size ", "Auto dim time"};
+String setup_menu_item[11] = {"Back to main", "PWM on delay", "LED on delay", "Turn-On Timing", "PWM off delay", "LED off delay", "Turn-Off Timing", "OLED sleep", "Duty step size", "Freq step size ", "Auto dim time"};
 //Wifi ssid and password
+
 char ssid[23];
 const char *password = NULL;
 //check ID
@@ -345,6 +346,29 @@ void drawMainMenu()
 
     if (page == 1) //show page 1 menu
     {
+        String str1, str2;
+        str1 = main_menu_item[0];
+        str2 = main_menu_item[1];
+        if (mypwm.getOnPriority() == PWM_ON_THEN_LED_ON)
+        {
+
+            str2 = "*" + str2;
+        }
+        else if (mypwm.getOnPriority() == LED_ON_THEN_PWM_ON)
+        {
+            str1 = "*" + str1;
+        }
+
+        if (mypwm.getOffPriority() == PWM_OFF_THEN_LED_OFF)
+        {
+
+            str2 = str2 + "*";
+        }
+        else if (mypwm.getOffPriority() == LED_OFF_THEN_PWM_OFF)
+        {
+            str1 = str1 + "*";
+        }
+
         char buffer[50];
         display.clear();
         display.setColor(WHITE);
@@ -366,15 +390,16 @@ void drawMainMenu()
 
             drawDutyFreq();
             display.setFont(Serif_plain_12);
+
             if (mypwm.getPwmState())
-                MenuItemSelected(main_menu_item[0] + "ON", 0, true, setup_mode);
+                MenuItemSelected(str1 + "ON", 0, true, setup_mode);
             else
-                MenuItemSelected(main_menu_item[0] + "OFF", 0, true, setup_mode);
+                MenuItemSelected(str1 + "OFF", 0, true, setup_mode);
 
             if (mypwm.getLedState())
-                MenuItemSelected(main_menu_item[1] + "ON", 16, false, setup_mode);
+                MenuItemSelected(str2 + "ON", 16, false, setup_mode);
             else
-                MenuItemSelected(main_menu_item[1] + "OFF", 16, false, setup_mode);
+                MenuItemSelected(str2 + "OFF", 16, false, setup_mode);
         }
         else if (menuIndex == 1 && frame == 2)
         {
@@ -389,9 +414,9 @@ void drawMainMenu()
             drawDutyFreq();
             display.setFont(Serif_plain_12);
             if (mypwm.getLedState())
-                MenuItemSelected(main_menu_item[1] + "ON", 0, true, setup_mode);
+                MenuItemSelected(str2 + "ON", 0, true, setup_mode);
             else
-                MenuItemSelected(main_menu_item[1] + "OFF", 0, true, setup_mode);
+                MenuItemSelected(str2 + "OFF", 0, true, setup_mode);
 
             MenuItemSelected(main_menu_item[2], 16, false, setup_mode);
         }
@@ -502,14 +527,14 @@ void drawMainMenu()
             drawDutyFreq();
             display.setFont(Serif_plain_12);
             if (mypwm.getPwmState())
-                MenuItemSelected(main_menu_item[0] + "ON", 0, false, setup_mode);
+                MenuItemSelected(str1 + "ON", 0, false, setup_mode);
             else
-                MenuItemSelected(main_menu_item[0] + "OFF", 0, false, setup_mode);
+                MenuItemSelected(str1 + "OFF", 0, false, setup_mode);
 
             if (mypwm.getLedState())
-                MenuItemSelected(main_menu_item[1] + "ON", 16, true, setup_mode);
+                MenuItemSelected(str2 + "ON", 16, true, setup_mode);
             else
-                MenuItemSelected(main_menu_item[1] + "OFF", 16, true, setup_mode);
+                MenuItemSelected(str2 + "OFF", 16, true, setup_mode);
         }
         else if (menuIndex == 2 && frame == 2)
         {
@@ -525,9 +550,9 @@ void drawMainMenu()
             display.drawXbm(display.getWidth() - 32, 0, bell_curve_width, bell_curve_height, bell_curve_bits);
             display.setFont(Serif_plain_12);
             if (mypwm.getLedState())
-                MenuItemSelected(main_menu_item[1] + "ON", 0, false, setup_mode);
+                MenuItemSelected(str2 + "ON", 0, false, setup_mode);
             else
-                MenuItemSelected(main_menu_item[1] + "OFF", 0, false, setup_mode);
+                MenuItemSelected(str2 + "OFF", 0, false, setup_mode);
 
             MenuItemSelected(main_menu_item[2], 16, true, setup_mode);
         }
@@ -729,22 +754,21 @@ void drawSetupMenu()
              * |LED on delay time |
              * --------------
              * 
-             *  ON sequence 
+             *  Turn-On Timing
              * 
              */
             display.drawXbm(display.getWidth() - 32, 0, time_icon_width, time_icon_height, time_icon_bits);
             MenuItemSelected(setup_menu_item[2], 0, true, setup_mode);
             MenuItemSelected(setup_menu_item[3], 16, false, setup_mode);
         }
-
         else if (setup_menu_index == 3 && setup_frame == 4)
         {
             /**
              *--------------
-             *|  On sequence|
+             *|  Turn-On Timing|
              * -------------
              * 
-             *  Screen saver
+             *  pwm_off_delay
              * 
              */
             display.drawXbm(display.getWidth() - 32, 0, sequence_icon_width, sequence_icon_height, sequence_icon_bits);
@@ -754,40 +778,86 @@ void drawSetupMenu()
 
         else if (setup_menu_index == 4 && setup_frame == 5)
         {
-
-            /**  
-             * ----------------
-             * |  Screen Saver  |
-             * -----------------
+            /**
              * 
-             *  Duty step 
+             * --------------
+             * |PWM off delay |
+             * --------------
              * 
-             * */
-            display.drawXbm(display.getWidth() - 32, 0, sleep_icon_width, sleep_icon_height, sleep_icon_bits);
+             *  LED off delay
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, time_icon_width, time_icon_height, time_icon_bits);
             MenuItemSelected(setup_menu_item[4], 0, true, setup_mode);
             MenuItemSelected(setup_menu_item[5], 16, false, setup_mode);
         }
-
         else if (setup_menu_index == 5 && setup_frame == 6)
+        {
+            /**
+             * 
+             * --------------
+             * |LED off delay |
+             * --------------
+             * 
+             *  Turn-Off Timing 
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, time_icon_width, time_icon_height, time_icon_bits);
+            MenuItemSelected(setup_menu_item[5], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[6], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 6 && setup_frame == 7)
+        {
+            /**
+             *--------------
+             *|  Turn-Off Timing|
+             * -------------
+             * 
+             *  OLED sleep
+             * 
+             */
+            display.drawXbm(display.getWidth() - 32, 0, sequence_icon_width, sequence_icon_height, sequence_icon_bits);
+            MenuItemSelected(setup_menu_item[6], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[7], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 7 && setup_frame == 8)
+        {
+
+            /**  
+             * ----------------
+             * |  OLED sleep  |
+             * -----------------
+             * 
+             *  Duty step size 
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, sleep_icon_width, sleep_icon_height, sleep_icon_bits);
+            MenuItemSelected(setup_menu_item[7], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[8], 16, false, setup_mode);
+        }
+
+        else if (setup_menu_index == 8 && setup_frame == 9)
         {
             /** 
              * ---------------   
-             * |Duty step
+             * |Duty step size
              * ---------------
              *            
-             * Freqstep 
+             * Freq step size
              * 
              * 
              * */
             display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
-            MenuItemSelected(setup_menu_item[5], 0, true, setup_mode);
-            MenuItemSelected(setup_menu_item[6], 16, false, setup_mode);
+            MenuItemSelected(setup_menu_item[8], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[9], 16, false, setup_mode);
         }
-        else if (setup_menu_index == 6 && setup_frame == 7)
+        else if (setup_menu_index == 9 && setup_frame == 10)
         {
             /** 
              * ---------- 
-             * Freq Step |
+             * Freq step size |
              * ----------
              * 
              * Auto dim time 
@@ -795,11 +865,15 @@ void drawSetupMenu()
              * 
              * */
             display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
-            MenuItemSelected(setup_menu_item[6], 0, true, setup_mode);
-            MenuItemSelected(setup_menu_item[7], 16, false, setup_mode);
+            MenuItemSelected(setup_menu_item[9], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[10], 16, false, setup_mode);
         }
 
-        //----------------------------
+        /**
+         * **************************************************************************
+         * 
+         * ************************************************************************* 
+         */
 
         else if (setup_menu_index == 1 && setup_frame == 1)
         {
@@ -855,10 +929,10 @@ void drawSetupMenu()
              *  On sequence
              * 
              * --------------
-             * | Screen saver|
+             * | PWM off time |
              * --------------
              */
-            display.drawXbm(display.getWidth() - 32, 0, sleep_icon_width, sleep_icon_height, sleep_icon_bits);
+            display.drawXbm(display.getWidth() - time_icon_width, 0, time_icon_width, time_icon_height, time_icon_bits);
             MenuItemSelected(setup_menu_item[3], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[4], 16, true, setup_mode);
         }
@@ -872,7 +946,7 @@ void drawSetupMenu()
              *| Duty step
              * ---------------
              */
-            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            display.drawXbm(display.getWidth() - time_icon_width, 0, time_icon_width, time_icon_height, time_icon_bits);
             MenuItemSelected(setup_menu_item[4], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[5], 16, true, setup_mode);
         }
@@ -887,7 +961,7 @@ void drawSetupMenu()
              * --------------
              * 
              * */
-            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            display.drawXbm(display.getWidth() - 32, 0, sequence_icon_width, sequence_icon_height, sequence_icon_bits);
             MenuItemSelected(setup_menu_item[5], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[6], 16, true, setup_mode);
         }
@@ -902,10 +976,56 @@ void drawSetupMenu()
              * --------------
              * 
              * */
-            display.drawXbm(display.getWidth() - 32, 0, auto_dim_icon_width, auto_dim_icon_height, auto_dim_icon_bits);
+            display.drawXbm(display.getWidth() - 32, 0, sleep_icon_width, sleep_icon_height, sleep_icon_bits);
             MenuItemSelected(setup_menu_item[6], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[7], 16, true, setup_mode);
         }
+        else if (setup_menu_index == 8 && setup_frame == 8)
+        {
+            /** 
+            * 
+             * Freq Step 
+             *
+             * --------------
+             * auto dim time |
+             * --------------
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            MenuItemSelected(setup_menu_item[7], 0, false, setup_mode);
+            MenuItemSelected(setup_menu_item[8], 16, true, setup_mode);
+        }
+        else if (setup_menu_index == 9 && setup_frame == 9)
+        {
+            /** 
+            * 
+             * Freq Step 
+             *
+             * --------------
+             * auto dim time |
+             * --------------
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            MenuItemSelected(setup_menu_item[8], 0, false, setup_mode);
+            MenuItemSelected(setup_menu_item[9], 16, true, setup_mode);
+        }
+        else if (setup_menu_index == 10 && setup_frame == 10)
+        {
+            /** 
+            * 
+             * Freq Step 
+             *
+             * --------------
+             * auto dim time |
+             * --------------
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, auto_dim_icon_width, auto_dim_icon_height, auto_dim_icon_bits);
+            MenuItemSelected(setup_menu_item[9], 0, false, setup_mode);
+            MenuItemSelected(setup_menu_item[10], 16, true, setup_mode);
+        }
+
         display.display();
     }
     else if (setup_page = 2)
@@ -926,49 +1046,90 @@ void drawSetupMenu()
             break;
         case 1 /*PWM on delay  */:
 
-            if (mypwm.getPwmOnDealy() == 0)
+            if (mypwm.getPwmOnDelay() == 0)
             {
                 sprintf(strTemp, "Normal turn-on");
             }
             else
             {
-                sprintf(strTemp, "Delay %dms turn-on", mypwm.getPwmOnDealy());
+                sprintf(strTemp, "Delay %dms turn-on", mypwm.getPwmOnDelay());
             }
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
             break;
         case 2 /*LED on delay  */:
-            if (mypwm.getLedOnDealy() == 0)
+            if (mypwm.getLedOnDelay() == 0)
             {
                 sprintf(strTemp, "Normal turn-on");
             }
             else
             {
-                sprintf(strTemp, "Delay %dms turn-on", mypwm.getLedOnDealy());
+                sprintf(strTemp, "Delay %dms turn-on", mypwm.getLedOnDelay());
             }
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
             break;
         case 3 /*Turn-On Priority*/:
             switch (mypwm.getOnPriority())
             {
-            case INDEPENDENT:
+            case INDEPENDENT_ON:
                 sprintf(strTemp, "PWM and LED are turn-on independently");
                 display.drawStringMaxWidth((display.getWidth() / 2), 10, display.getWidth(), strTemp);
                 break;
             case LED_ON_THEN_PWM_ON:
                 display.setTextAlignment(TEXT_ALIGN_CENTER);
-                sprintf(strTemp, "LED turn-on first then PWM delay %dms turn-on. ", mypwm.getPwmOnDealy());
+                sprintf(strTemp, "PWM delay %dms turn-on. ", mypwm.getPwmOnDelay());
                 display.drawStringMaxWidth((display.getWidth() / 2), 10, display.getWidth(), strTemp);
                 break;
             case PWM_ON_THEN_LED_ON:
                 display.setTextAlignment(TEXT_ALIGN_CENTER);
-                sprintf(strTemp, "PWM turn-on first then LED delay %dms turn-on.", mypwm.getLedOnDealy());
+                sprintf(strTemp, "LED delay %dms turn-on.", mypwm.getLedOnDelay());
                 display.drawStringMaxWidth((display.getWidth() / 2), 10, display.getWidth(), strTemp);
                 break;
             }
 
             break;
+        case 4 /* "PWM off delay" */:
+            if (mypwm.getPwmOffDelay() == 0)
+            {
+                sprintf(strTemp, "Normal turn-off");
+            }
+            else
+            {
+                sprintf(strTemp, "PWM signal delay %dms turn-on", mypwm.getPwmOffDelay());
+            }
+            display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
+            break;
 
-        case 4 /* "OLED Sleep" */:
+        case 5 /* "LED off Delay" */:
+            if (mypwm.getLedOffDelay() == 0)
+            {
+                sprintf(strTemp, "Normal turn-off");
+            }
+            else
+            {
+                sprintf(strTemp, "LED signal delay %dms turn-on", mypwm.getLedOffDelay());
+            }
+            display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
+            break;
+        case 6 /* "Turn-Off Priority" */:
+            switch (mypwm.getOffPriority())
+            {
+            case INDEPENDENT_OFF:
+                sprintf(strTemp, "PWM and LED are turn-off independently");
+                display.drawStringMaxWidth((display.getWidth() / 2), 10, display.getWidth(), strTemp);
+                break;
+            case LED_OFF_THEN_PWM_OFF:
+                display.setTextAlignment(TEXT_ALIGN_CENTER);
+                sprintf(strTemp, "PWM signal delay %dms turn-off. ", mypwm.getPwmOffDelay());
+                display.drawStringMaxWidth((display.getWidth() / 2), 10, display.getWidth(), strTemp);
+                break;
+            case PWM_OFF_THEN_LED_OFF:
+                display.setTextAlignment(TEXT_ALIGN_CENTER);
+                sprintf(strTemp, "LED signal delay %dms turn-off.", mypwm.getLedOffDelay());
+                display.drawStringMaxWidth((display.getWidth() / 2), 10, display.getWidth(), strTemp);
+                break;
+            }
+            break;
+        case 7 /* "OLED Sleep" */:
             if (mypwm.getOledSleepTime() == 0)
             {
                 sprintf(strTemp, "Screen saver disable.");
@@ -979,20 +1140,20 @@ void drawSetupMenu()
             }
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
             break;
-        case 5 /*"Duty Step" */:
+        case 8 /*"Duty Step" */:
 
             sprintf(strTemp, "Duty step size %.1f%%", mypwm.getDutyStep());
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
 
             break;
-        case 6 /* "Freq Step "*/:
+        case 9 /* "Freq Step "*/:
 
             sprintf(strTemp, "Freq step size %.1f kHz", (float)mypwm.getFreqStep() / 1000);
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
             //DEBUG_PRINTF( "FreqStep %.1f \r\n", (float) mypwm.getFreqStep() /1000 );
 
             break;
-        case 7 /* "Auto dim time" */:
+        case 10 /* "Auto dim time" */:
             sprintf(strTemp, "Dimming time %.2fS", (float)mypwm.getAutoDimStepTime() / 1000);
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
             break;
@@ -1034,6 +1195,7 @@ void readRotaryEncoder()
 
 void SetupMenu(void)
 {
+    // Serial.printf("setup_menu_index %d\r\n" , setup_menu_index );
     // up Rotary encoder
     if (up && setup_page == 1)
     {
@@ -1067,6 +1229,18 @@ void SetupMenu(void)
         {
             setup_frame--;
         }
+        if (setup_menu_index == 8 && setup_frame == 9)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 9 && setup_frame == 10)
+        {
+            setup_frame--;
+        }
+        if (setup_menu_index == 10 && setup_frame == 11)
+        {
+            setup_frame--;
+        }
         setup_last_menu_index = setup_menu_index;
         setup_menu_index--;
         if (setup_menu_index < 0)
@@ -1077,12 +1251,12 @@ void SetupMenu(void)
 
     else if (up && setup_page == 2 && setup_menu_index == 1) //PWM ON delay
     {
-        mypwm.setPwmOnDealy(mypwm.getPwmOnDealy() + ON_DELAY_STEP);
+        mypwm.setPwmOnDelay(mypwm.getPwmOnDelay() + ON_DELAY_STEP);
         up = false; //reset button
     }
     else if (up && setup_page == 2 && setup_menu_index == 2) //"LED On delay"
     {
-        mypwm.setLedOnDealy(mypwm.getLedOnDealy() + ON_DELAY_STEP);
+        mypwm.setLedOnDelay(mypwm.getLedOnDelay() + ON_DELAY_STEP);
 
         up = false; //reset button
     }
@@ -1091,7 +1265,27 @@ void SetupMenu(void)
         mypwm.setOnPriority(mypwm.getOnPriority() + 1);
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 4) // OLED Sleep
+
+    // new Add menu #####################################################
+    else if (up && setup_page == 2 && setup_menu_index == 4) //PWM OFF delay
+    {
+        mypwm.setPwmOffDelay(mypwm.getPwmOffDelay() + OFF_DELAY_STEP);
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 5) //"LED OFF delay"
+    {
+        mypwm.setLedOffDelay(mypwm.getLedOffDelay() + OFF_DELAY_STEP);
+
+        up = false; //reset button
+    }
+    else if (up && setup_page == 2 && setup_menu_index == 6) //Turn-OFF Priority
+    {
+        mypwm.setOffPriority(mypwm.getOffPriority() + 1);
+        up = false; //reset button
+    }
+    //#####################################################
+
+    else if (up && setup_page == 2 && setup_menu_index == 7) // OLED Sleep
     {
 
         if (mypwm.getOledSleepTime() < 0xffff) //8 hr
@@ -1101,18 +1295,18 @@ void SetupMenu(void)
 
         up = false; //reset button
     }
-    else if (up && setup_page == 2 && setup_menu_index == 5) // "Duty Step"
+    else if (up && setup_page == 2 && setup_menu_index == 8) // "Duty Step"
     {
 
         up = false; //reset button
         mypwm.setDutyStep(mypwm.getDutyStep() + MIN_DUTY_STEP);
     }
-    else if (up && setup_page == 2 && setup_menu_index == 6) // "Freq Step "
+    else if (up && setup_page == 2 && setup_menu_index == 9) // "Freq Step "
     {
         up = false; //reset button
         mypwm.setFreqStep(mypwm.getFreqStep() + MIN_FREQ_STEP);
     }
-    else if (up && setup_page == 2 && setup_menu_index == 7) // "Auto dim time"
+    else if (up && setup_page == 2 && setup_menu_index == 10) // "Auto dim time"
     {
         mypwm.setAutoDimStepTime(mypwm.getAutoDimStepTime() + MIN_AUTO_DIM_STEP_TIME);
         up = false; //reset button
@@ -1143,15 +1337,28 @@ void SetupMenu(void)
         {
             setup_frame++;
         }
+        else if (setup_menu_index == 6 && setup_last_menu_index == 5)
+        {
+            setup_frame++;
+        }
 
-        else if (setup_menu_index == 6 && setup_last_menu_index == 5 && setup_frame != 7)
+        else if (setup_menu_index == 7 && setup_last_menu_index == 6)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 8 && setup_last_menu_index == 7)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 9 && setup_last_menu_index == 8 && setup_frame != 10)
         {
             setup_frame++;
         }
 
         setup_last_menu_index = setup_menu_index;
         setup_menu_index++;
-        if (setup_menu_index == 8)
+        if (setup_menu_index == 11)
+
         {
             setup_menu_index--;
         }
@@ -1159,13 +1366,13 @@ void SetupMenu(void)
 
     else if (down && setup_page == 2 && setup_menu_index == 1) //PWM ON delay
     {
-        mypwm.setPwmOnDealy(mypwm.getPwmOnDealy() - ON_DELAY_STEP);
+        mypwm.setPwmOnDelay(mypwm.getPwmOnDelay() - ON_DELAY_STEP);
 
         down = false; //reset button
     }
     else if (down && setup_page == 2 && setup_menu_index == 2) //"LED On delay"
     {
-        mypwm.setLedOnDealy(mypwm.getLedOnDealy() - ON_DELAY_STEP);
+        mypwm.setLedOnDelay(mypwm.getLedOnDelay() - ON_DELAY_STEP);
 
         down = false; //reset button
     }
@@ -1176,24 +1383,43 @@ void SetupMenu(void)
 
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 4) // OLED Sleep
+    // Add here
+    else if (down && setup_page == 2 && setup_menu_index == 4) //PWM OFF delay
+    {
+        mypwm.setPwmOffDelay(mypwm.getPwmOffDelay() - OFF_DELAY_STEP);
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 5) //"LED OFF delay"
+    {
+        mypwm.setLedOffDelay(mypwm.getLedOffDelay() - OFF_DELAY_STEP);
+
+        down = false; //reset button
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 6) //Turn-OFF Priority
+    {
+        mypwm.setOffPriority(mypwm.getOffPriority() - 1);
+        down = false; //reset button
+    }
+    //
+
+    else if (down && setup_page == 2 && setup_menu_index == 7) // OLED Sleep
     {
 
         mypwm.setOledSleepTime(mypwm.getOledSleepTime() - 1);
 
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 5) // "Duty Step"
+    else if (down && setup_page == 2 && setup_menu_index == 8) // "Duty Step"
     {
         mypwm.setDutyStep(mypwm.getDutyStep() - MIN_DUTY_STEP);
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 6) // "Freq Step "
+    else if (down && setup_page == 2 && setup_menu_index == 9) // "Freq Step "
     {
         mypwm.setFreqStep(mypwm.getFreqStep() - MIN_FREQ_STEP);
         down = false; //reset button
     }
-    else if (down && setup_page == 2 && setup_menu_index == 7) // "Auto dim time"
+    else if (down && setup_page == 2 && setup_menu_index == 10) // "Auto dim time"
     {
         down = false; //reset button
         mypwm.setAutoDimStepTime(mypwm.getAutoDimStepTime() - MIN_AUTO_DIM_STEP_TIME);
@@ -1299,6 +1525,39 @@ void SetupMenu(void)
                 setup_page = 1;
             }
             break;
+        case 8:
+            /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
+            break;
+        case 9:
+            /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
+            break;
+        case 10:
+            /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
+            break;
         }
     }
 
@@ -1308,29 +1567,29 @@ void SetupMenu(void)
         middle_held = false;
         if (setup_page == 2 && setup_menu_index == 1) //"PWM ON delay"
         {
-            mypwm.setPwmOnDealy(0);
+            mypwm.setPwmOnDelay(0);
         }
         else if (setup_page == 2 && setup_menu_index == 2) //, "LED On delay"
         {
-            mypwm.setLedOnDealy(0);
+            mypwm.setLedOnDelay(0);
         }
         else if (setup_page == 2 && setup_menu_index == 3) //, "Turn-On Priority"
         {
             mypwm.setOnPriority(0);
         }
-        else if (setup_page == 2 && setup_menu_index == 4) //, "OLED Sleep"
+        else if (setup_page == 2 && setup_menu_index == 7) //, "OLED Sleep"
         {
             mypwm.setOledSleepTime(0);
         }
-        else if (setup_page == 2 && setup_menu_index == 5) //, "Duty Step size"
+        else if (setup_page == 2 && setup_menu_index == 8) //, "Duty Step size"
         {
             mypwm.setDutyStep(MIN_DUTY_STEP);
         }
-        else if (setup_page == 2 && setup_menu_index == 6) //, "Freq Step size "
+        else if (setup_page == 2 && setup_menu_index == 9) //, "Freq Step size "
         {
             mypwm.setFreqStep(MIN_FREQ_STEP);
         }
-        else if (setup_page == 2 && setup_menu_index == 7) //, "Auto dim time"};
+        else if (setup_page == 2 && setup_menu_index == 10) //, "Auto dim time"};
         {
             mypwm.setAutoDimStepTime(MIN_AUTO_DIM_STEP_TIME);
         }
@@ -1338,77 +1597,13 @@ void SetupMenu(void)
 }
 void TurnOn(int Index)
 {
-
-    switch (mypwm.getOnPriority())
+    //uint8_t nextPwmState, nextLedState;
+    if (Index == 0)
     {
-    case INDEPENDENT:
-        /* code */
-        if (Index == 0)
-        {
-            mypwm.setPwmState(!mypwm.getPwmState());
-        }
-        else if (Index == 1)
-        {
-            mypwm.setLedState(!mypwm.getLedState());
-        }
-        break;
+    }
 
-    case LED_ON_THEN_PWM_ON:
-
-        if (Index < 2)
-        {
-            if (mypwm.getLedState())
-            {
-                mypwm.setLedState(0);
-            }
-            else
-            {
-                mypwm.setLedState(1);
-            }
-
-            if (mypwm.getPwmState())
-            {
-                mypwm.setPwmState(0);
-            }
-            else
-            {
-                if (mypwm.getPwmOnDealy() > 0)
-                {
-                    vTaskDelay(pdMS_TO_TICKS(mypwm.getPwmOnDealy()));
-                }
-                mypwm.setPwmState(1);
-            }
-        }
-
-        break;
-
-    case PWM_ON_THEN_LED_ON:
-        if (Index < 2)
-        {
-            if (mypwm.getPwmState())
-            {
-                mypwm.setPwmState(0);
-            }
-            else
-            {
-                mypwm.setPwmState(1);
-            }
-
-            if (mypwm.getLedState())
-            {
-                mypwm.setLedState(0);
-            }
-            else
-            {
-                if (mypwm.getLedOnDealy() > 0)
-                {
-                    vTaskDelay(pdMS_TO_TICKS(mypwm.getLedOnDealy()));
-                }
-                mypwm.setLedState(1);
-            }
-        }
-
-        break;
+    if (Index == 1)
+    {
     }
 }
 // main menu mode
@@ -1650,6 +1845,7 @@ void MainMenu(void)
         save_yes_no = !save_yes_no;
     }
 
+    uint8_t nextPwmState, nextLedState;
     if (middle_click)
     {
         middle_click = false;
@@ -1657,13 +1853,95 @@ void MainMenu(void)
         switch (menuIndex)
         {
         case 0 /* PWM on off */:
-            TurnOn(menuIndex);
+            Serial.print( "PWM on off */: \r\n ");
+            nextPwmState = !mypwm.getPwmState();
+
+            if (nextPwmState == 1)
+            {
+                if (mypwm.getOnPriority() == INDEPENDENT_ON)
+                {
+                    mypwm.setPwmState(1);
+                }
+                else if (mypwm.getOnPriority() == LED_ON_THEN_PWM_ON)
+                {
+                    mypwm.setPwmState(0);
+                    mypwm.setLedState(1);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getPwmOnDelay()));
+                    mypwm.setPwmState(1);
+                }
+                else if (mypwm.getOnPriority() == PWM_ON_THEN_LED_ON)
+                {
+                    mypwm.setLedState(0);
+                    mypwm.setPwmState(1);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getLedOnDelay()));
+                    mypwm.setLedState(1);
+                }
+            }
+            else if (nextPwmState == 0)
+            {
+                if (mypwm.getOffPriority() == INDEPENDENT_OFF)
+                {
+                    mypwm.setPwmState(0);
+                }
+                else if (mypwm.getOffPriority() == LED_OFF_THEN_PWM_OFF)
+                {
+                    mypwm.setLedState(0);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getPwmOffDelay()));
+                    mypwm.setPwmState(0);
+                }
+                else if (mypwm.getOffPriority() == PWM_OFF_THEN_LED_OFF)
+                {
+                    mypwm.setPwmState(0);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getLedOffDelay()));
+                    mypwm.setLedState(0);
+                }
+            }
 
             break;
 
         case 1 /* LED on off*/:
 
-            TurnOn(menuIndex);
+            nextLedState = !mypwm.getLedState();
+            if (nextLedState == 1)
+            {
+                if (mypwm.getOnPriority() == INDEPENDENT_ON)
+                {
+                    mypwm.setLedState(1);
+                }
+                else if (mypwm.getOnPriority() == LED_ON_THEN_PWM_ON)
+                {
+                    mypwm.setPwmState(0);
+                    mypwm.setLedState(1);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getPwmOnDelay()));
+                    mypwm.setPwmState(1);
+                }
+                else if (mypwm.getOnPriority() == PWM_ON_THEN_LED_ON)
+                {
+                    mypwm.setLedState(0);
+                    mypwm.setPwmState(1);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getLedOnDelay()));
+                    mypwm.setLedState(1);
+                }
+            }
+            else if (nextLedState == 0)
+            {
+                if (mypwm.getOffPriority() == INDEPENDENT_OFF)
+                {
+                    mypwm.setLedState(0);
+                }
+                else if (mypwm.getOffPriority() == LED_OFF_THEN_PWM_OFF)
+                {
+                    mypwm.setLedState(0);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getPwmOffDelay()));
+                    mypwm.setPwmState(0);
+                }
+                else if (mypwm.getOffPriority() == PWM_OFF_THEN_LED_OFF)
+                {
+                    mypwm.setPwmState(0);
+                    vTaskDelay(pdMS_TO_TICKS(mypwm.getLedOffDelay()));
+                    mypwm.setLedState(0);
+                }
+            }
             break;
         case 2 /* Duty setup  */:
             if (page == 1)
