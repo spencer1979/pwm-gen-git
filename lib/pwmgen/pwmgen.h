@@ -33,17 +33,18 @@
 
 #define MIN_AUTO_DIM_STEP_TIME (10)    //min  Dimming time step size 10mS
 #define MAX_AUTO_DIM_STEP_TIME (10000) //max   Dimming time step size 10S
-// limit min & max turn on time  
+// limit min & max turn on time
 #define LED_MAX_ON_DELAY (10000)
 #define PWM_MAX_ON_DELAY (10000)
 #define ON_DELAY_STEP (10)
-// limit min & max turn off time  
+// limit min & max turn off time
 #define LED_MAX_OFF_DELAY (10000)
 #define PWM_MAX_OFF_DELAY (10000)
 #define OFF_DELAY_STEP (10)
 
 #define MAX_SLEEP_TIME (480) //120 minutes
-
+//ps-on pin as pwm output
+#define PS_ON_PWM_SOLID_DUTY (40) //40% duty
 typedef enum
 {
     PWM_OK = 0,
@@ -66,6 +67,13 @@ typedef enum
     PWM_OFF_THEN_LED_OFF
 
 } PWM_off_sequence_t;
+
+typedef enum
+{
+    PS_ON_NORMAL = 0,
+    PS_ON_AS_PWM,
+} ps_on_pin_fun_t;
+
 class Pwmgen
 {
 private:
@@ -87,11 +95,12 @@ private:
     int16_t _pwmOffDelay;
     int8_t _turnOffPriority;
     uint16_t _autoDimStepTime;
-
+    uint8_t _psOnPinFun; //new add ps-on pin function ,0 is normal on/off ,1 is PWM output soild duty ;
     // _timerBit
-    ledc_channel_config_t _pwm_channel;
     ledc_timer_config_t _pwm_timer;
-
+    ledc_channel_config_t _pwm_channel;
+    // led pin as pwm output
+    ledc_channel_config_t _led_channel;
     //Resolution of PWM duty (0-  2**timer_bit_ -1 )
     uint16_t _dutyRes;
 
@@ -112,7 +121,7 @@ public:
     PWM_on_sequence_t getOnPriority(void);
     void setOnPriority(int8_t type);
     //off delay function
-      int16_t getLedOffDelay();
+    int16_t getLedOffDelay();
     int16_t getPwmOffDelay();
     void setLedOffDelay(int16_t offDelay);
     void setPwmOffDelay(int16_t offDelay);
@@ -133,6 +142,10 @@ public:
     // pwm led on/off state
     void setPwmState(uint8_t pwmState);
     void setLedState(uint8_t ledState);
+    //ps-on (LED Pin) function
+    uint8_t getPsOnFun(void);
+    void setPsOnFun(uint8_t psOnFun);
+    // pin state
     uint8_t getPwmState(void);
     uint8_t getLedState(void);
     //oled sleep time
@@ -141,7 +154,8 @@ public:
     //auto dim
     int16_t getAutoDimStepTime(void);
     void setAutoDimStepTime(int16_t dimTime);
-
+    //two pwm mode
+    bool initPwmTimer();
     // constructor
     Pwmgen(int pwmOutputPin, int ledOutputPin);
     Pwmgen();

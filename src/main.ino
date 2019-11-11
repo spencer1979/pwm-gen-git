@@ -30,7 +30,7 @@
 #include <ESPAsyncWebServer.h>
 #include <config.h>
 // version
-#define PROGRAM_VERSION "2019-11-06"
+#define PROGRAM_VERSION "2019-11-11"
 //PWM gpio//PWM Duty and freq Setting (output)
 #define PWM_TIMER LEDC_TIMER_0
 #define PWM_TEST_FADE_TIME (60000)
@@ -81,7 +81,7 @@ bool AutoDimFlag = false;
 bool DutyDirection = true;
 // menu Text
 String main_menu_item[9] = {"PWM:", "LED:", "Duty setup", "Freq setup", "Auto dim", "Save", "Reset", "Sys Setup", "Wifi IP"};
-String setup_menu_item[11] = {"Back to main", "PWM on delay", "LED on delay", "Turn-On Timing", "PWM off delay", "LED off delay", "Turn-Off Timing", "OLED sleep", "Duty step size", "Freq step size ", "Auto dim time"};
+String setup_menu_item[12] = {"Back to main", "PWM on delay", "LED on delay", "Turn-On Timing", "PWM off delay", "LED off delay", "Turn-Off Timing", "OLED sleep", "Duty step size", "Freq step size ", "Auto dim time", "PS-ON as PWM "};
 //Wifi ssid and password
 
 char ssid[23];
@@ -147,6 +147,7 @@ void setup()
 #endif
     if (mypwm.begin())
     {
+
         DEBUG_PRINTF("duty is %.2f \r\n", mypwm.getDuty());
         DEBUG_PRINTF("System begin  \r\n");
         xTaskCreatePinnedToCore(vDisplayTask, "Dispaly Task", 6000, NULL, 3, NULL, 1);
@@ -347,26 +348,46 @@ void drawMainMenu()
     if (page == 1) //show page 1 menu
     {
         String str1, str2;
+
+        if (mypwm.getPsOnFun() == 1)
+        {
+            main_menu_item[1] = "PWM~:";
+        }
+        else
+        {
+            main_menu_item[1] = "LED:";
+        }
         str1 = main_menu_item[0];
         str2 = main_menu_item[1];
+
         if (mypwm.getOnPriority() == PWM_ON_THEN_LED_ON)
         {
-
-            str2 = "*" + str2;
+            if (mypwm.getLedOnDelay() > 0)
+            {
+                str2 = "*" + str2;
+            }
         }
         else if (mypwm.getOnPriority() == LED_ON_THEN_PWM_ON)
         {
-            str1 = "*" + str1;
+            if (mypwm.getPwmOnDelay() > 0)
+            {
+                str1 = "*" + str1;
+            }
         }
 
         if (mypwm.getOffPriority() == PWM_OFF_THEN_LED_OFF)
         {
-
-            str2 = str2 + "*";
+            if (mypwm.getLedOffDelay() > 0)
+            {
+                str2 = str2 + "*";
+            }
         }
         else if (mypwm.getOffPriority() == LED_OFF_THEN_PWM_OFF)
         {
-            str1 = str1 + "*";
+            if (mypwm.getPwmOffDelay() > 0)
+            {
+                str2 = str2 + "*";
+            }
         }
 
         char buffer[50];
@@ -705,6 +726,7 @@ void drawSetupMenu()
 {
     if (setup_page == 1)
     {
+
         char buffer[50];
         display.clear();
         display.setColor(WHITE);
@@ -868,7 +890,21 @@ void drawSetupMenu()
             MenuItemSelected(setup_menu_item[9], 0, true, setup_mode);
             MenuItemSelected(setup_menu_item[10], 16, false, setup_mode);
         }
-
+        else if (setup_menu_index == 10 && setup_frame == 11)
+        {
+            /** 
+             * ---------- 
+             * Auto dim time |
+             * ----------
+             * 
+             * PS ON AS PWM
+             * 
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, step_icon_width, step_icon_height, step_icon_bits);
+            MenuItemSelected(setup_menu_item[10], 0, true, setup_mode);
+            MenuItemSelected(setup_menu_item[11], 16, false, setup_mode);
+        }
         /**
          * **************************************************************************
          * 
@@ -1025,7 +1061,21 @@ void drawSetupMenu()
             MenuItemSelected(setup_menu_item[9], 0, false, setup_mode);
             MenuItemSelected(setup_menu_item[10], 16, true, setup_mode);
         }
-
+        else if (setup_menu_index == 11 && setup_frame == 11)
+        {
+            /** 
+            * 
+             * Auto dim time
+             *
+             * --------------
+             * PS_ON as PWM |
+             * --------------
+             * 
+             * */
+            display.drawXbm(display.getWidth() - 32, 0, auto_dim_icon_width, auto_dim_icon_height, auto_dim_icon_bits);
+            MenuItemSelected(setup_menu_item[10], 0, false, setup_mode);
+            MenuItemSelected(setup_menu_item[11], 16, true, setup_mode);
+        }
         display.display();
     }
     else if (setup_page = 2)
@@ -1157,6 +1207,17 @@ void drawSetupMenu()
             sprintf(strTemp, "Dimming time %.2fS", (float)mypwm.getAutoDimStepTime() / 1000);
             display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
             break;
+        case 11 /* "PS ON-AS PWM" */:
+            if (mypwm.getPsOnFun() == PS_ON_NORMAL)
+            {
+                sprintf(strTemp, "PSON as ON/OFF output");
+            }
+            else
+            {
+                sprintf(strTemp, "PSON as PWM output");
+            }
+            display.drawStringMaxWidth((display.getWidth() / 2), 16, display.getWidth(), strTemp);
+            break;
         }
 
         //display.drawString((display.getWidth() / 2), 13, strTemp);
@@ -1241,6 +1302,10 @@ void SetupMenu(void)
         {
             setup_frame--;
         }
+        if (setup_menu_index == 11 && setup_frame == 12)
+        {
+            setup_frame--;
+        }
         setup_last_menu_index = setup_menu_index;
         setup_menu_index--;
         if (setup_menu_index < 0)
@@ -1311,7 +1376,19 @@ void SetupMenu(void)
         mypwm.setAutoDimStepTime(mypwm.getAutoDimStepTime() + MIN_AUTO_DIM_STEP_TIME);
         up = false; //reset button
     }
+    else if (up && setup_page == 2 && setup_menu_index == 11) // "PS_ON pin as PWM"
+    {
 
+        up = false; //reset button
+        if (mypwm.getPsOnFun() == 1)
+        {
+            mypwm.setPsOnFun(0);
+        }
+        else
+        {
+            mypwm.setPsOnFun(1);
+        }
+    }
     // down  Rotary encoder
     if (down && setup_page == 1) //We have turned the Rotary Encoder Clockwise
     {
@@ -1350,14 +1427,18 @@ void SetupMenu(void)
         {
             setup_frame++;
         }
-        else if (setup_menu_index == 9 && setup_last_menu_index == 8 && setup_frame != 10)
+        else if (setup_menu_index == 9 && setup_last_menu_index == 8)
+        {
+            setup_frame++;
+        }
+        else if (setup_menu_index == 10 && setup_last_menu_index == 9 && setup_frame != 11)
         {
             setup_frame++;
         }
 
         setup_last_menu_index = setup_menu_index;
         setup_menu_index++;
-        if (setup_menu_index == 11)
+        if (setup_menu_index == 12)
 
         {
             setup_menu_index--;
@@ -1423,6 +1504,18 @@ void SetupMenu(void)
     {
         down = false; //reset button
         mypwm.setAutoDimStepTime(mypwm.getAutoDimStepTime() - MIN_AUTO_DIM_STEP_TIME);
+    }
+    else if (down && setup_page == 2 && setup_menu_index == 11) // "PS-on as pwm "
+    {
+        down = false; //reset button
+        if (mypwm.getPsOnFun() == 1)
+        {
+            mypwm.setPsOnFun(0);
+        }
+        else
+        {
+            mypwm.setPsOnFun(1);
+        }
     }
 
     //button clicked
@@ -1558,13 +1651,32 @@ void SetupMenu(void)
                 setup_page = 1;
             }
             break;
+        case 11:
+            /* code */
+            if (setup_page == 1)
+            {
+                setup_page = 2;
+            }
+            else if (setup_page == 2)
+            {
+                setup_page = 1;
+            }
+            break;
         }
     }
 
     //button hold to reset some thing
     if (middle_held)
-    {
+    {   
         middle_held = false;
+        if (setup_page==1 && setup_menu_index > 0)
+        {
+             setup_mode = false;
+            setup_menu_index = 0;
+            menuIndex = 0;
+            page = 1;  
+           
+        }
         if (setup_page == 2 && setup_menu_index == 1) //"PWM ON delay"
         {
             mypwm.setPwmOnDelay(0);
@@ -1576,6 +1688,18 @@ void SetupMenu(void)
         else if (setup_page == 2 && setup_menu_index == 3) //, "Turn-On Priority"
         {
             mypwm.setOnPriority(0);
+        }
+         else if (setup_page == 2 && setup_menu_index == 4) //, "Pwm off delay"
+        {
+            mypwm.setPwmOffDelay(0);
+        }
+         else if (setup_page == 2 && setup_menu_index == 5) //, "Led off delay"
+        {
+            mypwm.setLedOffDelay(0);
+        }
+         else if (setup_page == 2 && setup_menu_index == 6) //, "Turn-Off Priority"
+        {
+            mypwm.setOffPriority(0);
         }
         else if (setup_page == 2 && setup_menu_index == 7) //, "OLED Sleep"
         {
@@ -1593,26 +1717,21 @@ void SetupMenu(void)
         {
             mypwm.setAutoDimStepTime(MIN_AUTO_DIM_STEP_TIME);
         }
+        else if (setup_page == 2 && setup_menu_index == 11) //, "PS-ON as pwm"};
+        {
+            mypwm.setPsOnFun(0);
+        }
     }
 }
-void TurnOn(int Index)
-{
-    //uint8_t nextPwmState, nextLedState;
-    if (Index == 0)
-    {
-    }
 
-    if (Index == 1)
-    {
-    }
-}
 // main menu mode
 void MainMenu(void)
-{
-    static float LastDuty = 0;
+{ //save  previous duty for auto led dimming
+    static float PreDuty = 0;
     //static uint8_t SavePwmState = 0, SaveLedState = 0;
     static float AutoDimDuty = 0;
-
+    // save previous ps-on function
+    static float PrePsOnFun;
     // up Rotary encoder
     if (up && page == 1)
     {
@@ -1853,7 +1972,7 @@ void MainMenu(void)
         switch (menuIndex)
         {
         case 0 /* PWM on off */:
-            Serial.print( "PWM on off */: \r\n ");
+            Serial.print("PWM on off */: \r\n ");
             nextPwmState = !mypwm.getPwmState();
 
             if (nextPwmState == 1)
@@ -1985,12 +2104,18 @@ void MainMenu(void)
                         if (xTimerStart(xAutoDimTimer_Handler, 10) == pdTRUE)
                         {
 
-                            LastDuty = mypwm.getDuty();
+                            PreDuty = mypwm.getDuty();
                             AutoDimDuty = MIN_DUTY_STEP;
                             mypwm.setDuty(MIN_DUTY_STEP);
                             mypwm.setPwmState(1);
+                            PrePsOnFun = mypwm.getPsOnFun();
+                            if (mypwm.getPsOnFun() == PS_ON_AS_PWM)
+                            {
+                                mypwm.setPsOnFun(PS_ON_NORMAL);
+                                mypwm.initPwmTimer();
+                            }
                             mypwm.setLedState(1);
-
+                            mypwm.setPwmState(1);
                             DEBUG_PRINTF("AutoDim Timer Start  %d\r\n", xAutoDimTimer_Handler);
                         }
                     }
@@ -2011,13 +2136,20 @@ void MainMenu(void)
             }
             else if (page == 3)
             {
-                //stop timer
-                //set duty
+                //stop auto dimmming timer
+                //restore  duty
+                // restore ps-on fun
 
                 if (xTimerStop(xAutoDimTimer_Handler, 10) == pdTRUE)
                 {
-                    mypwm.setDuty(LastDuty);
+                    mypwm.setDuty(PreDuty);
                     mypwm.setPwmState(0);
+                    if (PrePsOnFun == PS_ON_AS_PWM)
+                    {
+                        mypwm.setPsOnFun(PrePsOnFun);
+                        mypwm.initPwmTimer();
+                    }
+
                     mypwm.setLedState(0);
 
                     DEBUG_PRINTF("AutoDimTimer Stop  %d\r\n", xAutoDimTimer_Handler);
@@ -2119,6 +2251,7 @@ void MainMenu(void)
             break;
         }
     }
+
 }
 /**
  * *************************************************************************
@@ -2132,7 +2265,7 @@ void SleepTimerCallBackFun(TimerHandle_t xtimer)
 
 /**
  * *************************************************************************
- * @brief  software timer call back function for Screen sleep function 
+ * @brief  software timer call back function for Auto dimming function
  * *************************************************************************
  */
 void AutoDimCallBackFun(TimerHandle_t xtimer)

@@ -47,14 +47,15 @@ uint8_t Pwmgen::getPwmState()
 uint8_t Pwmgen::getLedState()
 {
 
-    int level;
-    level = gpio_get_level((gpio_num_t)this->_ledPin);
+    //int level;
+    //level = gpio_get_level((gpio_num_t)this->_ledPin);
 
-    if (this->_ledState != level)
-    {
-        gpio_set_level((gpio_num_t)this->_ledPin, this->_ledState);
-    }
-    return gpio_get_level((gpio_num_t)this->_ledPin);
+    //if (this->_ledState != level)
+    //{
+    //     gpio_set_level((gpio_num_t)this->_ledPin, this->_ledState);
+    // }
+    // return gpio_get_level((gpio_num_t)this->_ledPin);
+    return this->_ledState;
 }
 
 bool Pwmgen::begin()
@@ -82,44 +83,8 @@ bool Pwmgen::begin()
     {
         return false;
     }
-    /*gpio setting*/
 
-    gpio_pad_select_gpio(this->_ledPin);
-    gpio_set_direction((gpio_num_t)this->_ledPin, GPIO_MODE_INPUT_OUTPUT);
-    gpio_set_level((gpio_num_t)this->_ledPin, 0); // init gpio state
-
-    /* PWM timer setting */
-    this->_pwm_timer.duty_resolution = LEDC_TIMER_10_BIT;
-    this->_dutyRes = (1U << (this->_pwm_timer.duty_resolution));
-    uint16_t temp_duty = 0;
-    //this->_pwm_timer.duty_resolu (1U << _pwm_timer.duty_resolution ) - 1U)tion = (ledc_timer_bit_t)this->_get_timer_bit(this->_freq);
-    DEBUG_PRINTF("## init timer bit : %i \r\n", LEDC_TIMER_10_BIT);
-    DEBUG_PRINTF("## init Duty resolution : %i \r\n", this->_dutyRes);
-    this->_pwm_timer.freq_hz = this->_freq;
-    this->_pwm_timer.speed_mode = LEDC_HIGH_SPEED_MODE;
-    this->_pwm_timer.timer_num = LEDC_TIMER_0;
-    temp_duty = map((double)(this->_duty / this->_dutyStep), 0, (double)(100 / this->_dutyStep), 0, this->_dutyRes - 1);
-    this->_pwm_channel.channel = LEDC_CHANNEL_0;
-    this->_pwm_channel.duty = temp_duty;
-    this->_pwm_channel.gpio_num = this->_pwmPin;
-    this->_pwm_channel.speed_mode = LEDC_HIGH_SPEED_MODE;
-    this->_pwm_channel.hpoint = 0;
-    this->_pwm_channel.timer_sel = LEDC_TIMER_0;
-    ledc_timer_config(&this->_pwm_timer);
-    ledc_channel_config(&this->_pwm_channel);
-    esp_err_t err = ledc_fade_func_install(0);
-    /* set default state */
-    err = ledc_set_duty_and_update(this->_pwm_channel.speed_mode, this->_pwm_channel.channel, 0, 0);
-    this->_pwmState = 0;
-    this->_ledState = 0;
-    if (err != ESP_OK)
-    {
-        DEBUG_PRINTF("Init PWM timer Fail !!\r\n");
-
-        return false;
-    }
-
-    return true;
+    return initPwmTimer();
 }
 
 void Pwmgen::setDutyStep(float dutyStep)
@@ -139,12 +104,12 @@ void Pwmgen::setAutoDimStepTime(int16_t dimTime)
 {
     if (dimTime > MAX_AUTO_DIM_STEP_TIME)
     {
-        dimTime = MAX_AUTO_DIM_STEP_TIME;
+        dimTime = MIN_AUTO_DIM_STEP_TIME;
     }
 
     if (dimTime < MIN_AUTO_DIM_STEP_TIME)
     {
-        dimTime = MIN_AUTO_DIM_STEP_TIME;
+        dimTime = MAX_AUTO_DIM_STEP_TIME;
     }
     this->_autoDimStepTime = dimTime;
 }
@@ -165,12 +130,12 @@ void Pwmgen::setOnPriority(int8_t type)
 {
     if (type > PWM_ON_THEN_LED_ON)
     {
-        type = PWM_ON_THEN_LED_ON;
+        type = INDEPENDENT_ON;
     }
 
     if (type < 0)
     {
-        type = INDEPENDENT_ON;
+        type =PWM_ON_THEN_LED_ON ;
     }
 
     this->_turnOnPriority = type;
@@ -194,12 +159,12 @@ void Pwmgen::setOffPriority(int8_t type)
 {
     if (type > PWM_OFF_THEN_LED_OFF)
     {
-        type = PWM_OFF_THEN_LED_OFF;
+        type = INDEPENDENT_OFF ;
     }
 
     if (type < 0)
     {
-        type = INDEPENDENT_OFF;
+        type = PWM_OFF_THEN_LED_OFF;
     }
 
     this->_turnOffPriority = type;
@@ -259,6 +224,7 @@ void Pwmgen::setFreq(uint32_t freq)
 
 void Pwmgen::setFreqStep(uint32_t freqStep)
 {
+
     if (freqStep > MAX_FREQ_STEP)
         freqStep = MAX_FREQ_STEP;
     if (freqStep < MIN_FREQ_STEP)
@@ -301,27 +267,52 @@ void Pwmgen::setPwmState(uint8_t pwmState)
 
 void Pwmgen::setLedState(uint8_t ledState)
 {
-    int level;
-    /*check pin level*/
-    level = gpio_get_level((gpio_num_t)this->_ledPin);
-
-    if ((uint8_t)level != ledState)
+    esp_err_t err;
+    uint8_t level;
+    if (this->_psOnPinFun == PS_ON_NORMAL)
     {
-        Serial.println("Set pin ");
-        if (ledState == 1)
+        level = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+
+        if (level != ledState)
         {
+            Serial.println("Set pin ");
+            if (ledState == 1)
+            {
 
-            gpio_set_level((gpio_num_t)this->_ledPin, 1);
+                gpio_set_level((gpio_num_t)this->_ledPin, 1);
 
-            this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+                this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+            }
+            else if (ledState == 0)
+            {
+
+                gpio_set_level((gpio_num_t)this->_ledPin, 0);
+
+                this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+            }
         }
-        else if (ledState == 0)
-        {
-
-            gpio_set_level((gpio_num_t)this->_ledPin, 0);
-
-            this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
-        }
+    }
+    else if (this->_psOnPinFun == PS_ON_AS_PWM)
+    {
+      
+            if (ledState == 1)
+            {
+                Serial.printf("Duty 40% is %d\r\n", map(PS_ON_PWM_SOLID_DUTY, 0, 100, 0, 1023));
+                err = ledc_set_duty_and_update(this->_led_channel.speed_mode, this->_led_channel.channel, map(PS_ON_PWM_SOLID_DUTY, 0, 100, 0, 1023), 0);
+                if (err == ESP_OK)
+                {
+                    this->_ledState = 1;
+                }
+            }
+            else if (ledState == 0)
+            {
+                err = ledc_set_duty_and_update(this->_led_channel.speed_mode, this->_led_channel.channel, 0, 0);
+                if (err == ESP_OK)
+                {
+                    this->_ledState = 0;
+                }
+            }
+        
     }
 }
 
@@ -410,7 +401,8 @@ void Pwmgen::setPwmOffDelay(int16_t offDelay)
 
 pwm_err Pwmgen::saveSettings(void)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
+    const size_t capacity = JSON_OBJECT_SIZE(13) + 180;
+    ;
     //DynamicJsonDocument doc(capacity);
     StaticJsonDocument<capacity> doc;
     DeserializationError err;
@@ -432,7 +424,7 @@ pwm_err Pwmgen::saveSettings(void)
     doc["TURN_ON_PRI"] = this->_turnOnPriority;    //  LED and PWM signal turn on sequence
     doc["TURN_OFF_PRI"] = this->_turnOffPriority;
     doc["AUTO_DIM_STEP_TIME"] = this->_autoDimStepTime; //auto dimming time 500 mSecond .
-
+    doc["PS_ON_PIN_FUN"] = this->_psOnPinFun;
     DEBUG_PRINTF("Create JSON contents below :\r\n  ");
 
     byteWrite = serializeJsonPretty(doc, Serial);
@@ -469,7 +461,8 @@ pwm_err Pwmgen::saveSettings(void)
 
 pwm_err Pwmgen::resetSettings(void)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
+    const size_t capacity = JSON_OBJECT_SIZE(13) + 180;
+    ;
     //DynamicJsonDocument doc(capacity);
     StaticJsonDocument<capacity> doc;
     DeserializationError err;
@@ -510,7 +503,7 @@ pwm_err Pwmgen::resetSettings(void)
     this->_pwmOffDelay = doc["PWM_OFF_DELAY"];          // 0
     this->_turnOffPriority = doc["TURN_OFF_PRI"];       // 0
     this->_autoDimStepTime = doc["AUTO_DIM_STEP_TIME"]; // 500
-
+    this->_psOnPinFun = doc["PS_ON_PIN_FUN"];           // 0 is normal , 1 is pwm mode
     fileWrite = serializeJson(doc, f2);
     if (!fileWrite)
     {
@@ -533,7 +526,8 @@ pwm_err Pwmgen::resetSettings(void)
  */
 pwm_err Pwmgen::_createDefaultSettings(const char *file)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
+    const size_t capacity = JSON_OBJECT_SIZE(13) + 180;
+    ;
     //DynamicJsonDocument doc(capacity);
     StaticJsonDocument<capacity> doc;
 
@@ -555,7 +549,7 @@ pwm_err Pwmgen::_createDefaultSettings(const char *file)
     doc["PWM_OFF_DELAY"] = 0;                           // PWM signal turn on delay 0mS
     doc["TURN_OFF_PRI"] = (uint8_t)INDEPENDENT_OFF;     //  LED and PWM signal turn on sequence
     doc["AUTO_DIM_STEP_TIME"] = MIN_AUTO_DIM_STEP_TIME; //auto dimming time 500 mSecond .
-
+    doc["PS_ON_PIN_FUN"] = 1;                           //  ps_on pin mode 0 is normal , 1 is pwm mode
     DEBUG_PRINTF("Create JSON contents below :\r\n  ");
     serializeJsonPretty(doc, Serial);
     f = SPIFFS.open(file, "w+");
@@ -589,7 +583,8 @@ pwm_err Pwmgen::_createDefaultSettings(const char *file)
  */
 pwm_err Pwmgen::loadSettings(const char *file)
 {
-    const size_t capacity = JSON_OBJECT_SIZE(12) + 160;
+    const size_t capacity = JSON_OBJECT_SIZE(13) + 180;
+    ;
     //DynamicJsonDocument doc(capacity); // documents smaller than 1KB
     StaticJsonDocument<capacity> doc; // documents larger than 1KB
     DeserializationError err;
@@ -637,6 +632,7 @@ pwm_err Pwmgen::loadSettings(const char *file)
     this->_pwmOffDelay = (int16_t)doc["PWM_OFF_DELAY"];           // 0
     this->_turnOffPriority = (int8_t)doc["TURN_OFF_PRI"];         // 0
     this->_autoDimStepTime = (uint16_t)doc["AUTO_DIM_STEP_TIME"]; // 500
+    this->_psOnPinFun = (uint8_t)doc["PS_ON_PIN_FUN"];            // 0 is normal , 1 is pwm mode
 
     DEBUG_PRINTF("Serialization data:%d \r\n", err.code());
     serializeJsonPretty(doc, Serial);
@@ -645,4 +641,64 @@ pwm_err Pwmgen::loadSettings(const char *file)
     f.close();
     doc.clear();
     return PWM_OK;
+}
+
+bool Pwmgen::initPwmTimer()
+{
+    esp_err_t err;
+    /* PWM timer setting */
+    this->_pwm_timer.duty_resolution = LEDC_TIMER_10_BIT;
+    this->_dutyRes = (1U << (this->_pwm_timer.duty_resolution));
+    this->_pwm_timer.freq_hz = this->_freq;
+    this->_pwm_timer.speed_mode = LEDC_HIGH_SPEED_MODE;
+    this->_pwm_timer.timer_num = LEDC_TIMER_0;
+    this->_pwm_channel.channel = LEDC_CHANNEL_0;
+    this->_pwm_channel.duty = 0;
+    this->_pwm_channel.gpio_num = this->_pwmPin;
+    this->_pwm_channel.speed_mode = LEDC_HIGH_SPEED_MODE;
+    this->_pwm_channel.hpoint = 0;
+    this->_pwm_channel.timer_sel = LEDC_TIMER_0;
+    ledc_timer_config(&this->_pwm_timer);
+    ledc_channel_config(&this->_pwm_channel);
+
+    /*gpio setting*/
+    if (this->_psOnPinFun == PS_ON_NORMAL)
+    {
+        gpio_pad_select_gpio(this->_ledPin);
+        err = gpio_set_direction((gpio_num_t)this->_ledPin, GPIO_MODE_INPUT_OUTPUT);
+        err = gpio_set_level((gpio_num_t)this->_ledPin, 0); // init gpio state
+    }
+    else if (this->_psOnPinFun == PS_ON_AS_PWM)
+    {
+        this->_led_channel.channel = LEDC_CHANNEL_1;
+        this->_led_channel.duty = 0;
+        this->_led_channel.gpio_num = this->_ledPin;
+        this->_led_channel.speed_mode = LEDC_HIGH_SPEED_MODE;
+        this->_led_channel.hpoint = 0;
+        this->_led_channel.timer_sel = LEDC_TIMER_0;
+
+        err = ledc_channel_config(&this->_led_channel);
+    }
+    err = ledc_fade_func_install(0);
+
+    if (err != ESP_OK)
+    {
+        DEBUG_PRINTF("Init PWM timer Fail !!\r\n");
+
+        return false;
+    }
+
+    return true;
+}
+
+//ps-on (LED Pin) function
+uint8_t Pwmgen::getPsOnFun(void)
+{
+    return this->_psOnPinFun;
+}
+void Pwmgen::setPsOnFun(uint8_t psOnFun)
+{
+    this->_psOnPinFun = psOnFun;
+
+    this->initPwmTimer();
 }
