@@ -30,7 +30,7 @@
 #include <ESPAsyncWebServer.h>
 #include <config.h>
 // version
-#define PROGRAM_VERSION "2019-11-11"
+#define PROGRAM_VERSION "2019-11-19"
 //PWM gpio//PWM Duty and freq Setting (output)
 #define PWM_TIMER LEDC_TIMER_0
 #define PWM_TEST_FADE_TIME (60000)

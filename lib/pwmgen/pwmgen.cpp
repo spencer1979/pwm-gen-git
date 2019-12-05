@@ -135,7 +135,7 @@ void Pwmgen::setOnPriority(int8_t type)
 
     if (type < 0)
     {
-        type =PWM_ON_THEN_LED_ON ;
+        type = PWM_ON_THEN_LED_ON;
     }
 
     this->_turnOnPriority = type;
@@ -159,7 +159,7 @@ void Pwmgen::setOffPriority(int8_t type)
 {
     if (type > PWM_OFF_THEN_LED_OFF)
     {
-        type = INDEPENDENT_OFF ;
+        type = INDEPENDENT_OFF;
     }
 
     if (type < 0)
@@ -271,48 +271,50 @@ void Pwmgen::setLedState(uint8_t ledState)
     uint8_t level;
     if (this->_psOnPinFun == PS_ON_NORMAL)
     {
-        level = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+        // level = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
 
-        if (level != ledState)
+        // if (level != ledState)
+        // {
+        //     Serial.println("Set pin ");
+        //     if (ledState == 1)
+        //     {
+
+        esp_err_t err = gpio_set_level((gpio_num_t)this->_ledPin, ledState);
+        if (err == ESP_OK)
         {
-            Serial.println("Set pin ");
-            if (ledState == 1)
-            {
-
-                gpio_set_level((gpio_num_t)this->_ledPin, 1);
-
-                this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
-            }
-            else if (ledState == 0)
-            {
-
-                gpio_set_level((gpio_num_t)this->_ledPin, 0);
-
-                this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
-            }
+            this->_ledState = ledState;
         }
+        //         this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+        //     }
+        //     else if (ledState == 0)
+        //     {
+
+        //         gpio_set_level((gpio_num_t)this->_ledPin, 0);
+
+        //         this->_ledState = (uint8_t)gpio_get_level((gpio_num_t)this->_ledPin);
+        //     }
+        // }
     }
     else if (this->_psOnPinFun == PS_ON_AS_PWM)
     {
-      
-            if (ledState == 1)
+
+        if (ledState == 1)
+        {
+            Serial.printf("Duty 40% is %d\r\n", map(PS_ON_PWM_SOLID_DUTY, 0, 100, 0, 1023));
+            err = ledc_set_duty_and_update(this->_led_channel.speed_mode, this->_led_channel.channel, map(PS_ON_PWM_SOLID_DUTY, 0, 100, 0, 1023), 0);
+            if (err == ESP_OK)
             {
-                Serial.printf("Duty 40% is %d\r\n", map(PS_ON_PWM_SOLID_DUTY, 0, 100, 0, 1023));
-                err = ledc_set_duty_and_update(this->_led_channel.speed_mode, this->_led_channel.channel, map(PS_ON_PWM_SOLID_DUTY, 0, 100, 0, 1023), 0);
-                if (err == ESP_OK)
-                {
-                    this->_ledState = 1;
-                }
+                this->_ledState = 1;
             }
-            else if (ledState == 0)
+        }
+        else if (ledState == 0)
+        {
+            err = ledc_set_duty_and_update(this->_led_channel.speed_mode, this->_led_channel.channel, 0, 0);
+            if (err == ESP_OK)
             {
-                err = ledc_set_duty_and_update(this->_led_channel.speed_mode, this->_led_channel.channel, 0, 0);
-                if (err == ESP_OK)
-                {
-                    this->_ledState = 0;
-                }
+                this->_ledState = 0;
             }
-        
+        }
     }
 }
 
